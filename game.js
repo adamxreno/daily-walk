@@ -9,7 +9,7 @@ const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
 // ---------- helpers ----------
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v)));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 function resize() {
   // Match CSS-scaled size
