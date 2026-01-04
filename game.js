@@ -1,4 +1,4 @@
-// Daily Walk (MVP) — known-working build
+// Daily Walk (MVP) — Gray background edition
 // Tap/Space to rise. Avoid darkness. Light dims on contact. Light restores with calm flying.
 
 const canvas = document.getElementById("c");
@@ -15,6 +15,19 @@ function resize() {
 }
 window.addEventListener("resize", resize);
 resize();
+
+// ---------- palette ----------
+const COLORS = {
+  bg: "#bdbdbd",
+  speck: "rgba(0,0,0,0.10)",
+  pipe: "rgba(0,0,0,0.78)",
+  pipeRim: "rgba(255,255,255,0.18)",
+  text: "rgba(0,0,0,0.82)",
+  textMuted: "rgba(0,0,0,0.55)",
+  hudBg: "rgba(255,255,255,0.35)",
+  hudFill: "rgba(0,0,0,0.65)",
+  player: "rgba(255,255,255,0.95)",
+};
 
 // ---------- state ----------
 const S = {
@@ -183,63 +196,91 @@ function roundRectFill(x, y, w, h, r, fillStyle) {
   ctx.fill();
 }
 
+function roundRectStroke(x, y, w, h, r, strokeStyle, lineWidth = 2) {
+  if (h <= 0 || w <= 0) return;
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.strokeStyle = strokeStyle;
+  ctx.lineWidth = lineWidth;
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+  ctx.stroke();
+}
+
 function draw() {
   const w = window.innerWidth;
   const h = window.innerHeight;
 
-  ctx.clearRect(0, 0, w, h);
+  // solid gray background
+  ctx.fillStyle = COLORS.bg;
+  ctx.fillRect(0, 0, w, h);
 
-  // stars
-  ctx.globalAlpha = 0.25;
-  ctx.fillStyle = "white";
-  for (let i = 0; i < 24; i++) {
-    const x = (i * 97 + Math.floor(performance.now() / 30)) % w;
-    const y = (i * 53) % h;
+  // subtle speckle texture (replaces stars, fits gray)
+  ctx.fillStyle = COLORS.speck;
+  for (let i = 0; i < 90; i++) {
+    const x = (i * 131 + Math.floor(performance.now() / 20)) % w;
+    const y = (i * 79) % h;
     ctx.fillRect(x, y, 2, 2);
   }
-  ctx.globalAlpha = 1;
 
-  // pipes
+  // pipes (darkness)
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
 
-    roundRectFill(p.x, 0, p.w, gapTop, 10, "rgba(0,0,0,0.78)");
-    roundRectFill(p.x, gapBot, p.w, h - gapBot, 10, "rgba(0,0,0,0.78)");
+    roundRectFill(p.x, 0, p.w, gapTop, 12, COLORS.pipe);
+    roundRectFill(p.x, gapBot, p.w, h - gapBot, 12, COLORS.pipe);
+
+    // rim so it reads clearly on gray
+    roundRectStroke(p.x + 1, 1, p.w - 2, gapTop - 2, 12, COLORS.pipeRim, 2);
+    roundRectStroke(p.x + 1, gapBot + 1, p.w - 2, (h - gapBot) - 2, 12, COLORS.pipeRim, 2);
   }
 
-  // player glow
-  const glow = 18 + 34 * S.light;
-  const alpha = 0.25 + 0.55 * S.light;
+  // player glow (subtle on gray)
+  const glow = 16 + 30 * S.light;
+  const alpha = 0.18 + 0.40 * S.light;
 
   ctx.beginPath();
   ctx.arc(S.x, S.y, glow, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(255,255,255,${alpha * 0.12})`;
+  ctx.fillStyle = `rgba(255,255,255,${alpha})`;
   ctx.fill();
 
+  // player body
   ctx.beginPath();
   ctx.arc(S.x, S.y, S.r, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.fillStyle = COLORS.player;
   ctx.fill();
+
+  // tiny outline so the player pops on light bg
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(0,0,0,0.20)";
+  ctx.stroke();
 
   // HUD
   ctx.font = "700 16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.fillStyle = COLORS.text;
   ctx.fillText(`Score: ${S.score}`, 14, 26);
 
   ctx.font = "600 12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-  ctx.fillStyle = "rgba(255,255,255,0.60)";
+  ctx.fillStyle = COLORS.textMuted;
   ctx.fillText(`Best: ${S.best}`, 14, 44);
 
   // light bar
   const bx = 14, by = 56, bw = 160, bh = 10;
-  roundRectFill(bx, by, bw, bh, 999, "rgba(255,255,255,0.10)");
-  roundRectFill(bx, by, bw * S.light, bh, 999, `rgba(255,255,255,${0.20 + 0.65 * S.light})`);
+  roundRectFill(bx, by, bw, bh, 999, COLORS.hudBg);
+  roundRectFill(bx, by, bw * S.light, bh, 999, COLORS.hudFill);
+
+  ctx.fillStyle = COLORS.textMuted;
   ctx.fillText("Light", bx + bw + 10, by + 10);
 
+  // message
   if (S.msg) {
     ctx.font = "700 13px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    ctx.fillStyle = COLORS.text;
     ctx.fillText(S.msg, 14, 86);
   }
 }
