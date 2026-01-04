@@ -65,7 +65,6 @@ canvas {
 }
 
 .scrollBox {
-  position: relative;
   height: 200px;
   overflow: auto;
   border-radius: 14px;
@@ -82,17 +81,6 @@ canvas {
   white-space: pre-wrap;
 }
 
-.fadeBottom {
-  pointer-events: none;
-  position: sticky;
-  bottom: 0;
-  height: 42px;
-  background: linear-gradient(to bottom, rgba(20,24,32,0), rgba(20,24,32,0.92));
-  border-bottom-left-radius: 14px;
-  border-bottom-right-radius: 14px;
-  margin-top: -42px;
-}
-
 .unlockRow {
   display: flex;
   align-items: center;
@@ -106,10 +94,39 @@ canvas {
   color: rgba(255,255,255,0.62);
 }
 
+.hint.right {
+  text-align: right;
+  min-width: 130px;
+}
+
 .btn {
   border: 0;
   padding: 10px 14px;
   border-radius: 12px;
   font-weight: 900;
   background: rgba(255,255,255,0.92);
-  color:
+  color: rgba(0,0,0,0.85);
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btnSecondary {
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.88);
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.shareStatus {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.62);
+  min-height: 16px;
+}
