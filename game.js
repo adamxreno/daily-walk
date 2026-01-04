@@ -1,5 +1,4 @@
-// Daily Walk — WEB Daily Verse + Share + 5s Lock + Guaranteed Pipe Spacing
-// WEB is public domain and based on ASV 1901 lineage. :contentReference[oaicite:1]{index=1}
+// Daily Walk — WEB Daily Verse + “Send to your friends!” + 5s Lock + Guaranteed Pipe Spacing
 
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
@@ -16,7 +15,7 @@ function mulberry32(seed) {
   };
 }
 
-// UTC date string so everyone shares the same daily verse
+// UTC date so everyone shares the same daily verse
 function yyyymmddUTC() {
   const d = new Date();
   const y = d.getUTCFullYear();
@@ -26,6 +25,14 @@ function yyyymmddUTC() {
 }
 function dailySeedFromUTCDate() {
   return parseInt(yyyymmddUTC(), 10);
+}
+function formatDateUTCShort() {
+  const d = new Date();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const m = months[d.getUTCMonth()];
+  const day = d.getUTCDate();
+  const y = d.getUTCFullYear();
+  return `${m} ${day}, ${y}`;
 }
 
 // ---------- Verse UI ----------
@@ -37,11 +44,11 @@ const verseTrEl = document.getElementById("verseTr");
 const verseTextEl = document.getElementById("verseText");
 const continueBtn = document.getElementById("continueBtn");
 const unlockHint = document.getElementById("unlockHint");
-const shareBtn = document.getElementById("shareBtn");
+const sendBtn = document.getElementById("sendBtn");
 const shareStatus = document.getElementById("shareStatus");
 const resultText = document.getElementById("resultText");
 
-// WEB verses (public domain) — keep them short + uplifting
+// WEB verses (public domain) — short + uplifting
 const VERSES_WEB = [
   {
     ref: "Philippians 4:6–7",
@@ -98,12 +105,10 @@ let unlockRAF = null;
 
 function showVerseOverlay({ score, best }) {
   const v = pickDailyVerse();
-  const date = yyyymmddUTC();
 
-  dailyTagEl.textContent = `Daily verse • ${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}`;
+  dailyTagEl.textContent = `Daily verse • ${formatDateUTCShort()}`;
   verseRefEl.textContent = v.ref;
   verseTrEl.textContent = "WEB";
-
   verseTextEl.textContent = v.text;
 
   cardTitleEl.textContent = "It’s okay, try again.";
@@ -131,7 +136,8 @@ function tickUnlock() {
   const left = Math.ceil(leftMs / 1000);
 
   if (leftMs <= 0) {
-    unlockHint.textContent = "Ready 🙂";
+    // No “Ready 🙂” — just enable Continue and clear timer text
+    unlockHint.textContent = "";
     continueBtn.disabled = false;
     unlockRAF = null;
     return;
@@ -147,36 +153,44 @@ continueBtn.addEventListener("click", () => {
   resetRun();
 });
 
-// ---------- Share ----------
-function lightBar(score) {
-  const blocks = 5;
-  const filled = clamp(Math.floor(score / 10), 0, blocks);
-  return "█".repeat(filled) + "░".repeat(blocks - filled);
+// ---------- “Send to your friends!” ----------
+const GAME_URL = "https://adamxreno.github.io/daily-walk/";
+function buildInviteMessage() {
+  return `I love this new game and think you will too!! 👀 ${GAME_URL}`;
 }
 
-function buildShareText(score) {
-  const date = `${yyyymmddUTC().slice(0,4)}-${yyyymmddUTC().slice(4,6)}-${yyyymmddUTC().slice(6,8)}`;
-  const v = pickDailyVerse();
-  return `Daily Walk — ${date}
-Score: ${score}
-Light: ${lightBar(score)}
-Daily Verse: ${v.ref} (WEB)`;
-}
+async function sendToFriends() {
+  const text = buildInviteMessage();
 
-async function copyToClipboard(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
+  // Best experience on mobile (iOS/Android): native share sheet
+  if (navigator.share) {
+    try {
+      await navigator.share({ text, url: GAME_URL, title: "Daily Walk" });
+      shareStatus.textContent = "";
+      return;
+    } catch {
+      // If user cancels share, do nothing.
+    }
+  }
+
+  // Fallback: open SMS composer (works well on mobile)
+  const smsUrl = `sms:&body=${encodeURIComponent(text)}`;
+  // Some browsers block window.open for non-user-initiated events, but this is a click.
+  const opened = window.open(smsUrl, "_self");
+
+  // Last fallback: copy to clipboard
+  if (!opened && navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(text);
+      shareStatus.textContent = "Copied message — paste it to a friend 🙂";
+      return;
+    } catch {
+      shareStatus.textContent = "Couldn’t open messages. Copy this link: " + GAME_URL;
+    }
   }
 }
 
-shareBtn.addEventListener("click", async () => {
-  const text = buildShareText(S.lastRunScore ?? 0);
-  const ok = await copyToClipboard(text);
-  shareStatus.textContent = ok ? "Copied!" : "Couldn’t copy (browser blocked it).";
-});
+sendBtn.addEventListener("click", sendToFriends);
 
 // ---------- Canvas sizing ----------
 function resizeCanvas() {
@@ -191,7 +205,6 @@ resizeCanvas();
 // ---------- Game State ----------
 const S = {
   running: true,
-
   x: 0, y: 0, vy: 0, r: 12,
 
   gravity: 1350,
@@ -215,7 +228,7 @@ const S = {
   pipeId: 0,
   lastGapY: null,
 
-  // GUARANTEED spacing controls
+  // Guaranteed spacing
   spacingBase: 380,
   spacingMin: 330,
   spawnLead: 1100,
@@ -261,7 +274,6 @@ function resetRun() {
   const w = window.innerWidth;
   const startX = w + 520;
   const spacing = S.spacingBase;
-
   for (let i = 0; i < 3; i++) spawnPipe(startX + i * spacing);
   ensurePipesAhead();
 }
@@ -366,7 +378,7 @@ function draw() {
   const w = window.innerWidth;
   const h = window.innerHeight;
 
-  // background (same vibe)
+  // background vibe preserved
   ctx.fillStyle = "#171b22";
   ctx.fillRect(0, 0, w, h);
 
@@ -380,7 +392,7 @@ function draw() {
   }
   ctx.globalAlpha = 1;
 
-  // pipes (no outlines)
+  // pipes (clean, no outlines)
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
@@ -435,7 +447,7 @@ function draw() {
   ctx.globalAlpha = 1;
 }
 
-// ---------- Guaranteed spacing (fixes double pipes) ----------
+// ---------- Guaranteed spacing (fixes “double pipes”) ----------
 function spacingPx() {
   const tighten = clamp(S.score * 0.9, 0, 50);
   return clamp(S.spacingBase - tighten, S.spacingMin, S.spacingBase);
@@ -470,7 +482,6 @@ function update(dt) {
   for (const p of S.pipes) p.x -= S.scroll * dt;
   S.pipes = S.pipes.filter(p => p.x + p.w > -140);
 
-  // top up pipeline
   ensurePipesAhead();
 
   // player physics
