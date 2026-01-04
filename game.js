@@ -1,11 +1,5 @@
-// Daily Walk — Daily Verse + Share + Fair Difficulty Tuning
-// Key changes:
-// - Daily verse (same for everyone, seeded by UTC date)
-// - Share result (Wordle-style text copied to clipboard)
-// - End message: "It’s okay, try again."
-// - Pipe spacing now DISTANCE-based (not time-based) so speed doesn't create huge empty gaps
-// - Early-game spacing + smoother vertical transitions (no impossible high-to-low jumps)
-// - Light regen tuned so you can't fully recharge just by time passing
+// Daily Walk — WEB Daily Verse + Share + 5s Lock + Guaranteed Pipe Spacing
+// WEB is public domain and based on ASV 1901 lineage. :contentReference[oaicite:1]{index=1}
 
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
@@ -13,7 +7,6 @@ const ctx = canvas.getContext("2d");
 // ---------- Utilities ----------
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-// Deterministic PRNG
 function mulberry32(seed) {
   return function () {
     let t = (seed += 0x6D2B79F5);
@@ -23,7 +16,7 @@ function mulberry32(seed) {
   };
 }
 
-// UTC date string for a truly shared "daily"
+// UTC date string so everyone shares the same daily verse
 function yyyymmddUTC() {
   const d = new Date();
   const y = d.getUTCFullYear();
@@ -40,72 +33,113 @@ const verseOverlay = document.getElementById("verseOverlay");
 const cardTitleEl = document.getElementById("cardTitle");
 const dailyTagEl = document.getElementById("dailyTag");
 const verseRefEl = document.getElementById("verseRef");
+const verseTrEl = document.getElementById("verseTr");
 const verseTextEl = document.getElementById("verseText");
-const verseScroll = document.getElementById("verseScroll");
 const continueBtn = document.getElementById("continueBtn");
 const unlockHint = document.getElementById("unlockHint");
 const shareBtn = document.getElementById("shareBtn");
 const shareStatus = document.getElementById("shareStatus");
 const resultText = document.getElementById("resultText");
 
-// Curated uplifting verses (short + broadly encouraging).
-const VERSES = [
-  { ref: "Isaiah 41:10", text: "Do not fear, for I am with you; do not be afraid, for I am your God. I will strengthen you; I will help you; I will hold on to you with my righteous right hand." },
-  { ref: "Psalm 34:18", text: "The Lord is near the brokenhearted; he saves those crushed in spirit." },
-  { ref: "Matthew 11:28", text: "Come to me, all of you who are weary and burdened, and I will give you rest." },
-  { ref: "Philippians 4:6–7", text: "Don’t worry about anything, but in everything, through prayer and petition with thanksgiving, present your requests to God. And the peace of God, which surpasses all understanding, will guard your hearts and minds." },
-  { ref: "Romans 15:13", text: "May the God of hope fill you with all joy and peace as you believe so that you may overflow with hope by the power of the Holy Spirit." },
-  { ref: "Psalm 46:1", text: "God is our refuge and strength, a helper who is always found in times of trouble." },
-  { ref: "2 Corinthians 12:9", text: "My grace is sufficient for you, for my power is perfected in weakness." },
-  { ref: "Joshua 1:9", text: "Be strong and courageous. Do not be afraid or discouraged, for the Lord your God is with you wherever you go." },
+// WEB verses (public domain) — keep them short + uplifting
+const VERSES_WEB = [
+  {
+    ref: "Philippians 4:6–7",
+    text:
+`In nothing be anxious, but in everything, by prayer and petition with thanksgiving, let your requests be made known to God.
+And the peace of God, which surpasses all understanding, will guard your hearts and your thoughts in Christ Jesus.`
+  },
+  {
+    ref: "Isaiah 41:10",
+    text:
+`Don’t you be afraid, for I am with you.
+Don’t be dismayed, for I am your God.
+I will strengthen you.
+Yes, I will help you.
+Yes, I will uphold you with the right hand of my righteousness.`
+  },
+  {
+    ref: "Psalm 46:1",
+    text:
+`God is our refuge and strength,
+a very present help in trouble.`
+  },
+  {
+    ref: "Matthew 11:28",
+    text:
+`“Come to me, all you who labor and are heavily burdened, and I will give you rest.”`
+  },
+  {
+    ref: "Psalm 34:18",
+    text:
+`Yahweh is near to those who have a broken heart,
+and saves those who have a crushed spirit.`
+  },
+  {
+    ref: "Joshua 1:9",
+    text:
+`Haven’t I commanded you?
+Be strong and courageous.
+Don’t be afraid.
+Don’t be dismayed, for Yahweh your God is with you wherever you go.`
+  },
 ];
 
 function pickDailyVerse() {
   const seed = dailySeedFromUTCDate();
   const rng = mulberry32(seed);
-  const idx = Math.floor(rng() * VERSES.length);
-  return VERSES[idx];
+  const idx = Math.floor(rng() * VERSES_WEB.length);
+  return VERSES_WEB[idx];
 }
+
+// 5 second lock
+let unlockAtMs = 0;
+let unlockRAF = null;
 
 function showVerseOverlay({ score, best }) {
   const v = pickDailyVerse();
-  dailyTagEl.textContent = `Daily verse • ${yyyymmddUTC().slice(0,4)}-${yyyymmddUTC().slice(4,6)}-${yyyymmddUTC().slice(6,8)}`;
+  const date = yyyymmddUTC();
+
+  dailyTagEl.textContent = `Daily verse • ${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}`;
   verseRefEl.textContent = v.ref;
+  verseTrEl.textContent = "WEB";
+
   verseTextEl.textContent = v.text;
 
   cardTitleEl.textContent = "It’s okay, try again.";
   resultText.textContent = `Score: ${score} • Best: ${best}`;
-
-  verseScroll.scrollTop = 0;
-  continueBtn.disabled = true;
-  unlockHint.textContent = "Scroll to the end to continue";
   shareStatus.textContent = "";
+
+  // Lock Continue for 5 seconds
+  continueBtn.disabled = true;
+  unlockAtMs = performance.now() + 5000;
+  tickUnlock();
 
   verseOverlay.classList.remove("hidden");
   verseOverlay.setAttribute("aria-hidden", "false");
-
-  requestAnimationFrame(checkVerseUnlock);
 }
 
 function hideVerseOverlay() {
   verseOverlay.classList.add("hidden");
   verseOverlay.setAttribute("aria-hidden", "true");
+  if (unlockRAF) cancelAnimationFrame(unlockRAF);
+  unlockRAF = null;
 }
 
-function checkVerseUnlock() {
-  const nearBottom =
-    verseScroll.scrollTop + verseScroll.clientHeight >= verseScroll.scrollHeight - 6;
+function tickUnlock() {
+  const leftMs = Math.max(0, unlockAtMs - performance.now());
+  const left = Math.ceil(leftMs / 1000);
 
-  if (nearBottom) {
-    continueBtn.disabled = false;
+  if (leftMs <= 0) {
     unlockHint.textContent = "Ready 🙂";
-  } else {
-    continueBtn.disabled = true;
-    unlockHint.textContent = "Scroll to the end to continue";
+    continueBtn.disabled = false;
+    unlockRAF = null;
+    return;
   }
-}
 
-verseScroll.addEventListener("scroll", checkVerseUnlock);
+  unlockHint.textContent = `Please wait ${left}s…`;
+  unlockRAF = requestAnimationFrame(tickUnlock);
+}
 
 continueBtn.addEventListener("click", () => {
   hideVerseOverlay();
@@ -113,25 +147,20 @@ continueBtn.addEventListener("click", () => {
   resetRun();
 });
 
-function buildShareText(score) {
-  const date = `${yyyymmddUTC().slice(0,4)}-${yyyymmddUTC().slice(4,6)}-${yyyymmddUTC().slice(6,8)}`;
-  const lightBlocks = lightBar(score);
-
-  // Example:
-  // Daily Walk — 2026-01-04
-  // Score: 23
-  // Light: ███░░
-  // play: https://...
-  return `Daily Walk — ${date}
-Score: ${score}
-Light: ${lightBlocks}`;
-}
-
-// A simple score->blocks mapping (5 blocks).
+// ---------- Share ----------
 function lightBar(score) {
   const blocks = 5;
   const filled = clamp(Math.floor(score / 10), 0, blocks);
   return "█".repeat(filled) + "░".repeat(blocks - filled);
+}
+
+function buildShareText(score) {
+  const date = `${yyyymmddUTC().slice(0,4)}-${yyyymmddUTC().slice(4,6)}-${yyyymmddUTC().slice(6,8)}`;
+  const v = pickDailyVerse();
+  return `Daily Walk — ${date}
+Score: ${score}
+Light: ${lightBar(score)}
+Daily Verse: ${v.ref} (WEB)`;
 }
 
 async function copyToClipboard(text) {
@@ -150,64 +179,55 @@ shareBtn.addEventListener("click", async () => {
 });
 
 // ---------- Canvas sizing ----------
-function resize() {
+function resizeCanvas() {
   const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
   canvas.width = Math.floor(window.innerWidth * dpr);
   canvas.height = Math.floor(window.innerHeight * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
-window.addEventListener("resize", resize);
-resize();
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
 
 // ---------- Game State ----------
 const S = {
   running: true,
 
-  // player
-  x: 0,
-  y: 0,
-  vy: 0,
-  r: 12,
+  x: 0, y: 0, vy: 0, r: 12,
 
-  // physics
   gravity: 1350,
   thrust: -420,
   maxFall: 900,
 
-  // scrolling
   baseScroll: 240,
   scroll: 240,
 
-  // light
   light: 1,
   drainOnHit: 0.28,
-  regenBasePerSec: 0.10,      // tuned down
-  regenCalmBonusPerSec: 0.08, // reward steadiness
-  regenCoastGateSec: 0.35,    // must go a moment without tapping to get the calm bonus
+  regenBasePerSec: 0.10,
+  regenCalmBonusPerSec: 0.08,
+  regenCoastGateSec: 0.35,
   lastFlapT: -999,
 
-  // obstacles
   pipes: [],
   pipeW: 78,
-  gapBase: 188,             // slightly tighter than 190 (but fair start handles early)
-  gapMin: 148,              // don't get absurdly tiny
+  gapBase: 188,
+  gapMin: 148,
   pipeId: 0,
   lastGapY: null,
 
-  // spawn by distance (NOT time)
-  spawnAccumPx: 0,
+  // GUARANTEED spacing controls
+  spacingBase: 380,
+  spacingMin: 330,
+  spawnLead: 1100,
 
-  // score
   score: 0,
   best: 0,
   passed: new Set(),
 
-  // message
   msg: "Tap / Space to rise. Stay steady.",
   msgT: 2.0,
   lastHitT: -999,
 
-  // last run (for share)
   lastRunScore: 0,
 };
 
@@ -229,7 +249,6 @@ function resetRun() {
 
   S.pipes = [];
   S.passed.clear();
-  S.spawnAccumPx = 0;
   S.score = 0;
   S.lastGapY = null;
 
@@ -238,18 +257,18 @@ function resetRun() {
   S.lastHitT = -999;
   S.lastFlapT = -999;
 
-  // FAIR START: first obstacles spawn farther off-screen with consistent spacing
+  // Start with a clean spaced pipeline
   const w = window.innerWidth;
-  const startX = w + 420;
-  const spacing = 380; // fixed pixel spacing early; feels "possible"
+  const startX = w + 520;
+  const spacing = S.spacingBase;
+
   for (let i = 0; i < 3; i++) spawnPipe(startX + i * spacing);
+  ensurePipesAhead();
 }
 
-// Smooth gap movement so the next gap doesn't jump from sky-high to ground-low instantly.
 function smoothGapY(targetGapY) {
   if (S.lastGapY == null) return targetGapY;
 
-  // Early game: smaller delta (more readable). Later: allow more movement.
   const baseMaxDelta = 150;
   const extra = clamp(S.score * 6, 0, 120);
   const maxDelta = baseMaxDelta + extra;
@@ -260,28 +279,19 @@ function smoothGapY(targetGapY) {
 function spawnPipe(x) {
   const h = window.innerHeight;
 
-  // Slight early forgiveness
   const earlyBonus = S.score < 8 ? 18 : 0;
-
-  const rawGap = (S.gapBase + earlyBonus) - S.score * 0.6; // slower tightening
+  const rawGap = (S.gapBase + earlyBonus) - S.score * 0.6;
   const gap = clamp(rawGap, S.gapMin, S.gapBase + earlyBonus);
 
   const margin = 70;
   const minY = margin + gap * 0.35;
   const maxY = h - margin - gap * 0.35;
 
-  const rng = Math.random();
-  let gapY = minY + (maxY - minY) * rng;
+  let gapY = minY + (maxY - minY) * Math.random();
   gapY = smoothGapY(gapY);
   S.lastGapY = gapY;
 
-  S.pipes.push({
-    id: S.pipeId++,
-    x,
-    w: S.pipeW,
-    gapY,
-    gapH: gap,
-  });
+  S.pipes.push({ id: S.pipeId++, x, w: S.pipeW, gapY, gapH: gap });
 }
 
 function circleRectCollide(cx, cy, r, rx, ry, rw, rh) {
@@ -308,7 +318,6 @@ function hit() {
 
 function endRun() {
   S.running = false;
-
   S.lastRunScore = S.score;
 
   if (S.score > S.best) {
@@ -316,7 +325,6 @@ function endRun() {
     saveBest();
   }
 
-  // Ritual overlay
   showVerseOverlay({ score: S.score, best: S.best });
 }
 
@@ -331,23 +339,15 @@ function flap() {
   S.vy = S.thrust * strength;
 }
 
-window.addEventListener("pointerdown", (e) => {
-  flap();
-});
+window.addEventListener("pointerdown", () => flap());
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space") {
     e.preventDefault();
     flap();
   }
-  if (e.key.toLowerCase() === "r") {
-    e.preventDefault();
-    if (!verseOverlay.classList.contains("hidden")) return;
-    S.running = true;
-    resetRun();
-  }
 });
 
-// ---------- Drawing ----------
+// ---------- Visual helpers ----------
 function roundRectFill(x, y, w, h, r, fillStyle) {
   if (h <= 0 || w <= 0) return;
   const rr = Math.min(r, w / 2, h / 2);
@@ -366,11 +366,11 @@ function draw() {
   const w = window.innerWidth;
   const h = window.innerHeight;
 
-  // Background: one notch lighter, same vibe
+  // background (same vibe)
   ctx.fillStyle = "#171b22";
   ctx.fillRect(0, 0, w, h);
 
-  // Stars
+  // stars
   ctx.globalAlpha = 0.28;
   ctx.fillStyle = "white";
   for (let i = 0; i < 24; i++) {
@@ -380,7 +380,7 @@ function draw() {
   }
   ctx.globalAlpha = 1;
 
-  // Pipes: clean (no outline)
+  // pipes (no outlines)
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
@@ -388,7 +388,7 @@ function draw() {
     roundRectFill(p.x, gapBot, p.w, h - gapBot, 12, "rgba(0,0,0,0.72)");
   }
 
-  // Player glow
+  // player glow
   const glow = 16 + 30 * S.light;
   const alpha = 0.20 + 0.55 * S.light;
 
@@ -397,7 +397,7 @@ function draw() {
   ctx.fillStyle = `rgba(255,255,255,${alpha * 0.12})`;
   ctx.fill();
 
-  // Player
+  // player
   ctx.beginPath();
   ctx.arc(S.x, S.y, S.r, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(255,255,255,0.88)";
@@ -412,21 +412,20 @@ function draw() {
   ctx.fillStyle = "rgba(255,255,255,0.62)";
   ctx.fillText(`Best: ${S.best}`, 14, 44);
 
-  // Light bar
+  // light bar
   const bx = 14, by = 56, bw = 160, bh = 10;
   roundRectFill(bx, by, bw, bh, 999, "rgba(255,255,255,0.12)");
   roundRectFill(bx, by, bw * S.light, bh, 999, `rgba(255,255,255,${0.22 + 0.65 * S.light})`);
   ctx.fillStyle = "rgba(255,255,255,0.62)";
   ctx.fillText("Light", bx + bw + 10, by + 10);
 
-  // Message (only when not in overlay)
   if (S.msg && verseOverlay.classList.contains("hidden")) {
     ctx.font = "700 13px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     ctx.fillStyle = "rgba(255,255,255,0.74)";
     ctx.fillText(S.msg, 14, 86);
   }
 
-  // Vignette (kept subtle)
+  // vignette
   ctx.globalAlpha = 0.18;
   const g = ctx.createLinearGradient(0, 0, 0, h);
   g.addColorStop(0, "rgba(0,0,0,0.16)");
@@ -436,23 +435,50 @@ function draw() {
   ctx.globalAlpha = 1;
 }
 
+// ---------- Guaranteed spacing (fixes double pipes) ----------
+function spacingPx() {
+  const tighten = clamp(S.score * 0.9, 0, 50);
+  return clamp(S.spacingBase - tighten, S.spacingMin, S.spacingBase);
+}
+
+function ensurePipesAhead() {
+  const w = window.innerWidth;
+  let rightmostX = -Infinity;
+  for (const p of S.pipes) rightmostX = Math.max(rightmostX, p.x);
+  if (!Number.isFinite(rightmostX)) rightmostX = w;
+
+  const needUntil = w + S.spawnLead;
+  const sp = spacingPx();
+
+  while (rightmostX < needUntil) {
+    rightmostX += sp;
+    spawnPipe(rightmostX);
+  }
+}
+
 // ---------- Loop ----------
 let last = performance.now();
 
 function update(dt) {
-  const w = window.innerWidth;
   const h = window.innerHeight;
 
-  // Speed increases slightly with score, but spawn spacing is distance-based now.
+  // speed
   const target = S.baseScroll + S.score * 4.2;
   S.scroll = target * (0.82 + 0.18 * S.light);
 
-  // Player physics
+  // move pipes
+  for (const p of S.pipes) p.x -= S.scroll * dt;
+  S.pipes = S.pipes.filter(p => p.x + p.w > -140);
+
+  // top up pipeline
+  ensurePipesAhead();
+
+  // player physics
   S.vy += S.gravity * dt;
   S.vy = clamp(S.vy, -1200, S.maxFall);
   S.y += S.vy * dt;
 
-  // Bounds = slip
+  // bounds = slip
   if (S.y < S.r) {
     S.y = S.r;
     S.vy *= -0.25;
@@ -463,24 +489,7 @@ function update(dt) {
     hit();
   }
 
-  // Move pipes
-  for (const p of S.pipes) p.x -= S.scroll * dt;
-  S.pipes = S.pipes.filter(p => p.x + p.w > -140);
-
-  // Distance-based spawning (fixes late-game "too much downtime")
-  S.spawnAccumPx += S.scroll * dt;
-
-  // Slightly tighter spacing later (still fair); NEVER increases with speed.
-  const baseSpacing = 360;
-  const lateTighten = clamp(S.score * 0.9, 0, 40);
-  const spacingPx = baseSpacing - lateTighten; // 360 → 320
-
-  while (S.spawnAccumPx >= spacingPx) {
-    S.spawnAccumPx -= spacingPx;
-    spawnPipe(w + 520);
-  }
-
-  // Collisions + scoring
+  // collisions + scoring
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
@@ -495,9 +504,7 @@ function update(dt) {
     }
   }
 
-  // Light regen tuning:
-  // - Always a little regen
-  // - Extra regen only if calm AND you haven't tapped very recently
+  // regen
   const t = performance.now() / 1000;
   const calm = Math.abs(S.vy) < 260;
   const coasting = (t - S.lastFlapT) >= S.regenCoastGateSec;
