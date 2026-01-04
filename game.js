@@ -1,4 +1,4 @@
-// Daily Walk — WEB Daily Verse + “Send to your friends!” + 5s Lock + Guaranteed Pipe Spacing
+// Daily Walk — WEB Daily Verse (no translation shown) + Send to Friends + 5s Lock + Guaranteed Pipe Spacing
 
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
@@ -39,8 +39,7 @@ function formatDateUTCShort() {
 const verseOverlay = document.getElementById("verseOverlay");
 const cardTitleEl = document.getElementById("cardTitle");
 const dailyTagEl = document.getElementById("dailyTag");
-const verseRefEl = document.getElementById("verseRef");
-const verseTrEl = document.getElementById("verseTr");
+const dateTextEl = document.getElementById("dateText");
 const verseTextEl = document.getElementById("verseText");
 const continueBtn = document.getElementById("continueBtn");
 const unlockHint = document.getElementById("unlockHint");
@@ -106,10 +105,11 @@ let unlockRAF = null;
 function showVerseOverlay({ score, best }) {
   const v = pickDailyVerse();
 
-  dailyTagEl.textContent = `Daily verse • ${formatDateUTCShort()}`;
-  verseRefEl.textContent = v.ref;
-  verseTrEl.textContent = "WEB";
-  verseTextEl.textContent = v.text;
+  dailyTagEl.textContent = "Here’s your daily verse 👍🏼";
+  dateTextEl.textContent = formatDateUTCShort();
+
+  // Verse text + reference on its own line (no translation shown)
+  verseTextEl.textContent = `${v.text}\n\n${v.ref}`;
 
   cardTitleEl.textContent = "It’s okay, try again.";
   resultText.textContent = `Score: ${score} • Best: ${best}`;
@@ -117,6 +117,10 @@ function showVerseOverlay({ score, best }) {
 
   // Lock Continue for 5 seconds
   continueBtn.disabled = true;
+  continueBtn.classList.add("hiddenBtn");
+  unlockHint.textContent = "Please wait 5s…";
+  unlockHint.style.display = "block";
+
   unlockAtMs = performance.now() + 5000;
   tickUnlock();
 
@@ -136,8 +140,9 @@ function tickUnlock() {
   const left = Math.ceil(leftMs / 1000);
 
   if (leftMs <= 0) {
-    // No “Ready 🙂” — just enable Continue and clear timer text
-    unlockHint.textContent = "";
+    // Countdown disappears, Continue appears in SAME spot (right side)
+    unlockHint.style.display = "none";
+    continueBtn.classList.remove("hiddenBtn");
     continueBtn.disabled = false;
     unlockRAF = null;
     return;
@@ -162,23 +167,21 @@ function buildInviteMessage() {
 async function sendToFriends() {
   const text = buildInviteMessage();
 
-  // Best experience on mobile (iOS/Android): native share sheet
   if (navigator.share) {
     try {
       await navigator.share({ text, url: GAME_URL, title: "Daily Walk" });
       shareStatus.textContent = "";
       return;
     } catch {
-      // If user cancels share, do nothing.
+      // user cancelled or browser blocked — fall through
     }
   }
 
-  // Fallback: open SMS composer (works well on mobile)
+  // Fallback: open SMS composer
   const smsUrl = `sms:&body=${encodeURIComponent(text)}`;
-  // Some browsers block window.open for non-user-initiated events, but this is a click.
   const opened = window.open(smsUrl, "_self");
 
-  // Last fallback: copy to clipboard
+  // Last fallback: copy
   if (!opened && navigator.clipboard) {
     try {
       await navigator.clipboard.writeText(text);
@@ -189,7 +192,6 @@ async function sendToFriends() {
     }
   }
 }
-
 sendBtn.addEventListener("click", sendToFriends);
 
 // ---------- Canvas sizing ----------
@@ -228,7 +230,6 @@ const S = {
   pipeId: 0,
   lastGapY: null,
 
-  // Guaranteed spacing
   spacingBase: 380,
   spacingMin: 330,
   spawnLead: 1100,
@@ -270,7 +271,6 @@ function resetRun() {
   S.lastHitT = -999;
   S.lastFlapT = -999;
 
-  // Start with a clean spaced pipeline
   const w = window.innerWidth;
   const startX = w + 520;
   const spacing = S.spacingBase;
@@ -280,11 +280,9 @@ function resetRun() {
 
 function smoothGapY(targetGapY) {
   if (S.lastGapY == null) return targetGapY;
-
   const baseMaxDelta = 150;
   const extra = clamp(S.score * 6, 0, 120);
   const maxDelta = baseMaxDelta + extra;
-
   return clamp(targetGapY, S.lastGapY - maxDelta, S.lastGapY + maxDelta);
 }
 
@@ -378,11 +376,9 @@ function draw() {
   const w = window.innerWidth;
   const h = window.innerHeight;
 
-  // background vibe preserved
   ctx.fillStyle = "#171b22";
   ctx.fillRect(0, 0, w, h);
 
-  // stars
   ctx.globalAlpha = 0.28;
   ctx.fillStyle = "white";
   for (let i = 0; i < 24; i++) {
@@ -392,7 +388,6 @@ function draw() {
   }
   ctx.globalAlpha = 1;
 
-  // pipes (clean, no outlines)
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
@@ -400,7 +395,6 @@ function draw() {
     roundRectFill(p.x, gapBot, p.w, h - gapBot, 12, "rgba(0,0,0,0.72)");
   }
 
-  // player glow
   const glow = 16 + 30 * S.light;
   const alpha = 0.20 + 0.55 * S.light;
 
@@ -409,13 +403,11 @@ function draw() {
   ctx.fillStyle = `rgba(255,255,255,${alpha * 0.12})`;
   ctx.fill();
 
-  // player
   ctx.beginPath();
   ctx.arc(S.x, S.y, S.r, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(255,255,255,0.88)";
   ctx.fill();
 
-  // HUD
   ctx.font = "700 16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
   ctx.fillStyle = "rgba(255,255,255,0.88)";
   ctx.fillText(`Score: ${S.score}`, 14, 26);
@@ -424,7 +416,6 @@ function draw() {
   ctx.fillStyle = "rgba(255,255,255,0.62)";
   ctx.fillText(`Best: ${S.best}`, 14, 44);
 
-  // light bar
   const bx = 14, by = 56, bw = 160, bh = 10;
   roundRectFill(bx, by, bw, bh, 999, "rgba(255,255,255,0.12)");
   roundRectFill(bx, by, bw * S.light, bh, 999, `rgba(255,255,255,${0.22 + 0.65 * S.light})`);
@@ -437,7 +428,6 @@ function draw() {
     ctx.fillText(S.msg, 14, 86);
   }
 
-  // vignette
   ctx.globalAlpha = 0.18;
   const g = ctx.createLinearGradient(0, 0, 0, h);
   g.addColorStop(0, "rgba(0,0,0,0.16)");
@@ -447,7 +437,7 @@ function draw() {
   ctx.globalAlpha = 1;
 }
 
-// ---------- Guaranteed spacing (fixes “double pipes”) ----------
+// ---------- Guaranteed spacing ----------
 function spacingPx() {
   const tighten = clamp(S.score * 0.9, 0, 50);
   return clamp(S.spacingBase - tighten, S.spacingMin, S.spacingBase);
@@ -474,22 +464,18 @@ let last = performance.now();
 function update(dt) {
   const h = window.innerHeight;
 
-  // speed
   const target = S.baseScroll + S.score * 4.2;
   S.scroll = target * (0.82 + 0.18 * S.light);
 
-  // move pipes
   for (const p of S.pipes) p.x -= S.scroll * dt;
   S.pipes = S.pipes.filter(p => p.x + p.w > -140);
 
   ensurePipesAhead();
 
-  // player physics
   S.vy += S.gravity * dt;
   S.vy = clamp(S.vy, -1200, S.maxFall);
   S.y += S.vy * dt;
 
-  // bounds = slip
   if (S.y < S.r) {
     S.y = S.r;
     S.vy *= -0.25;
@@ -500,7 +486,6 @@ function update(dt) {
     hit();
   }
 
-  // collisions + scoring
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
@@ -515,7 +500,6 @@ function update(dt) {
     }
   }
 
-  // regen
   const t = performance.now() / 1000;
   const calm = Math.abs(S.vy) < 260;
   const coasting = (t - S.lastFlapT) >= S.regenCoastGateSec;
@@ -541,7 +525,6 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-// boot
 loadBest();
 resetRun();
 loop();
