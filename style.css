@@ -85,8 +85,12 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   margin-top: 12px;
+}
+
+.spacer {
+  flex: 1;
 }
 
 .hint {
@@ -96,7 +100,7 @@ canvas {
 
 .hint.right {
   text-align: right;
-  min-width: 130px;
+  min-width: 140px;
 }
 
 .btn {
@@ -122,6 +126,14 @@ canvas {
   border-radius: 12px;
   font-weight: 850;
   cursor: pointer;
+}
+
+.rightBtn {
+  min-width: 140px;
+}
+
+.hiddenBtn {
+  display: none;
 }
 
 .shareStatus {
