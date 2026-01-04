@@ -1,5 +1,8 @@
-// Daily Walk (MVP) — Dark/Star vibe, slightly lifted background
-// Tap/Space to rise. Avoid darkness. Light dims on contact. Light restores with calm flying.
+// Daily Walk (MVP) — Dark/Star vibe, tuned readability + fair start
+// Changes:
+// - Background one notch lighter (same vibe)
+// - Removed pipe rim outline (clean pipes)
+// - Fair start: first pipes spawn farther right + better spacing + slightly larger early gap
 
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
@@ -45,7 +48,7 @@ const S = {
   pipes: [],
   pipeW: 78,
   gapBase: 190,
-  spawnEvery: 1.25,
+  spawnEvery: 1.25,     // still fine; spacing handled by spawn distance too
   spawnTimer: 0,
   pipeId: 0,
 
@@ -85,13 +88,20 @@ function resetRun() {
   S.msgT = 2.0;
   S.lastHitT = -999;
 
-  for (let i = 0; i < 3; i++) spawnPipe(window.innerWidth + i * 260);
+  // FAIR START:
+  // Start pipes farther to the right + more spacing so the player gets a clean first run.
+  const startX = window.innerWidth + 320; // push first obstacle off-screen
+  const spacing = 340;                   // more than before (260), avoids impossible clusters
+  for (let i = 0; i < 3; i++) spawnPipe(startX + i * spacing);
 }
 
 function spawnPipe(x) {
   const h = window.innerHeight;
 
-  const gap = clamp(S.gapBase - S.score * 0.8, 132, S.gapBase);
+  // Slightly larger gap at low score so the opening moments are fair and welcoming.
+  const earlyBonus = S.score < 6 ? 18 : 0; // extra pixels early
+  const gap = clamp((S.gapBase + earlyBonus) - S.score * 0.8, 132, S.gapBase + earlyBonus);
+
   const margin = 70;
 
   const minY = margin + gap * 0.35;
@@ -186,11 +196,12 @@ function draw() {
   const w = window.innerWidth;
   const h = window.innerHeight;
 
-  // background (slightly lifted, same vibe)
-  ctx.fillStyle = "#14171d";
+  // background (one notch lighter, same vibe)
+  // previous: #14171d
+  ctx.fillStyle = "#171b22";
   ctx.fillRect(0, 0, w, h);
 
-  // stars (same feel)
+  // stars
   ctx.globalAlpha = 0.28;
   ctx.fillStyle = "white";
   for (let i = 0; i < 24; i++) {
@@ -200,19 +211,14 @@ function draw() {
   }
   ctx.globalAlpha = 1;
 
-  // pipes (darkness) — slightly lighter than pure black, with subtle rim
+  // pipes (darkness) — CLEAN (no outline stroke)
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
 
-    roundRectFill(p.x, 0, p.w, gapTop, 12, "rgba(0,0,0,0.78)");
-    roundRectFill(p.x, gapBot, p.w, h - gapBot, 12, "rgba(0,0,0,0.78)");
-
-    // subtle rim (helps visibility)
-    ctx.strokeStyle = "rgba(255,255,255,0.10)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(p.x + 1, 1, p.w - 2, gapTop - 2);
-    ctx.strokeRect(p.x + 1, gapBot + 1, p.w - 2, (h - gapBot) - 2);
+    // slightly lighter than pure black so it reads against the bg without an outline
+    roundRectFill(p.x, 0, p.w, gapTop, 12, "rgba(0,0,0,0.72)");
+    roundRectFill(p.x, gapBot, p.w, h - gapBot, 12, "rgba(0,0,0,0.72)");
   }
 
   // player glow
@@ -253,7 +259,7 @@ function draw() {
     ctx.fillText(S.msg, 14, 86);
   }
 
-  // vignette (kept subtle)
+  // vignette (kept subtle; unchanged vibe)
   ctx.globalAlpha = 0.18;
   const g = ctx.createLinearGradient(0, 0, 0, h);
   g.addColorStop(0, "rgba(0,0,0,0.16)");
@@ -290,16 +296,16 @@ function update(dt) {
     hit();
   }
 
-  // spawn
+  // spawn timing
   S.spawnTimer += dt;
   if (S.spawnTimer >= S.spawnEvery) {
     S.spawnTimer = 0;
-    spawnPipe(w + 40);
+    spawnPipe(w + 520); // spawn farther right to avoid sudden near-spawn overlaps
   }
 
   // move pipes
   for (const p of S.pipes) p.x -= S.scroll * dt;
-  S.pipes = S.pipes.filter(p => p.x + p.w > -60);
+  S.pipes = S.pipes.filter(p => p.x + p.w > -120);
 
   // collisions + scoring
   for (const p of S.pipes) {
