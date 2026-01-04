@@ -65,7 +65,7 @@ Yes, I will help you.
 Yes, I will uphold you with the right hand of my righteousness.`
   },
   {
-    ref: "Psalm 46:1",
+    ref: "Psalms 46:1",
     text:
 `God is our refuge and strength,
 a very present help in trouble.`
@@ -76,7 +76,7 @@ a very present help in trouble.`
 `“Come to me, all you who labor and are heavily burdened, and I will give you rest.”`
   },
   {
-    ref: "Psalm 34:18",
+    ref: "Psalms 34:18",
     text:
 `Yahweh is near to those who have a broken heart,
 and saves those who have a crushed spirit.`
