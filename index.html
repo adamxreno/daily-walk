@@ -8,6 +8,35 @@
 </head>
 <body>
   <canvas id="c"></canvas>
+
+  <!-- Verse overlay -->
+  <div id="verseOverlay" class="overlay hidden" aria-hidden="true">
+    <div class="card">
+      <div class="cardTitle" id="cardTitle">It’s okay, try again.</div>
+
+      <div class="cardSub">
+        <span id="dailyTag">Daily verse</span> • <span id="verseRef">Verse</span>
+      </div>
+
+      <div class="resultRow">
+        <div class="resultText" id="resultText">Score: 0 • Best: 0</div>
+        <button id="shareBtn" class="btnSecondary">Share</button>
+      </div>
+
+      <div id="verseScroll" class="scrollBox">
+        <div id="verseText" class="verseText"></div>
+        <div class="fadeBottom"></div>
+      </div>
+
+      <div class="unlockRow">
+        <div id="unlockHint" class="hint">Scroll to the end to continue</div>
+        <button id="continueBtn" class="btn" disabled>Continue</button>
+      </div>
+
+      <div class="shareStatus" id="shareStatus"></div>
+    </div>
+  </div>
+
   <script src="game.js"></script>
 </body>
 </html>
