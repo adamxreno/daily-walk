@@ -5,16 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Liiiiiiight</title>
   <link rel="stylesheet" href="style.css" />
-
-  <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 </head>
 <body>
-  <!-- Always-visible HUD layer -->
+  <!-- Always-visible header (logo only) -->
   <div id="hudTop" aria-hidden="true">
-    <!-- Put your updated logo file in the repo root as logo.svg -->
     <img id="logo" src="logo.svg" alt="Liiiiiiight" />
-    <button id="soundBtn" class="iconBtn" title="Sound">🔊</button>
   </div>
 
   <canvas id="c"></canvas>
@@ -47,6 +43,10 @@
       <div class="shareStatus" id="shareStatus"></div>
     </div>
   </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
 
   <script src="game.js"></script>
 </body>
