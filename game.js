@@ -1,4 +1,4 @@
-// Liiiiiiight — Day/Night Cycle + Soft Sounds + Logo HUD + Daily Verse (WEB public domain wording)
+// Liiiiiiight — earned day/night + tap-to-start + daily verse + send-to-friends + soft sound
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
@@ -46,9 +46,6 @@ const unlockHint = document.getElementById("unlockHint");
 const sendBtn = document.getElementById("sendBtn");
 const shareStatus = document.getElementById("shareStatus");
 const resultText = document.getElementById("resultText");
-
-// Sound button
-const soundBtn = document.getElementById("soundBtn");
 
 // WEB (public domain) wording
 const VERSES_WEB = [
@@ -194,16 +191,14 @@ async function sendToFriends() {
 }
 sendBtn.addEventListener("click", sendToFriends);
 
-// ---------- Sound (quick + pleasant, not annoying) ----------
-let audio = {
-  enabled: true,
+// ---------- Sound (no mute button) ----------
+const audio = {
   ctx: null,
   master: null,
   ready: false,
 };
 
 function ensureAudio() {
-  if (!audio.enabled) return;
   if (audio.ready) return;
 
   const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -211,13 +206,12 @@ function ensureAudio() {
 
   audio.ctx = new Ctx();
   audio.master = audio.ctx.createGain();
-  audio.master.gain.value = 0.22;
+  audio.master.gain.value = 0.22; // subtle
   audio.master.connect(audio.ctx.destination);
   audio.ready = true;
 }
 
 function playTone({ type="sine", freq=440, dur=0.06, gain=0.08, attack=0.002, release=0.03 }) {
-  if (!audio.enabled) return;
   ensureAudio();
   if (!audio.ready) return;
 
@@ -240,8 +234,9 @@ function playTone({ type="sine", freq=440, dur=0.06, gain=0.08, attack=0.002, re
 }
 
 function sfxFlap() {
-  playTone({ type:"triangle", freq: 880, dur: 0.035, gain: 0.06, release: 0.02 });
-  playTone({ type:"triangle", freq: 1320, dur: 0.030, gain: 0.05, release: 0.02 });
+  // quick “seatbelt-ish” chirp, very short
+  playTone({ type:"triangle", freq: 880, dur: 0.032, gain: 0.06, release: 0.02 });
+  playTone({ type:"triangle", freq: 1320, dur: 0.028, gain: 0.05, release: 0.02 });
 }
 function sfxHit() {
   playTone({ type:"sine", freq: 150, dur: 0.045, gain: 0.08, release: 0.04 });
@@ -249,17 +244,6 @@ function sfxHit() {
 function sfxScore() {
   playTone({ type:"sine", freq: 660, dur: 0.03, gain: 0.045, release: 0.02 });
 }
-
-function updateSoundButton() {
-  soundBtn.textContent = audio.enabled ? "🔊" : "🔇";
-}
-soundBtn.addEventListener("click", () => {
-  audio.enabled = !audio.enabled;
-  if (!audio.enabled && audio.master) audio.master.gain.value = 0.0;
-  if (audio.enabled && audio.master) audio.master.gain.value = 0.22;
-  updateSoundButton();
-});
-updateSoundButton();
 
 // ---------- Canvas sizing ----------
 function resizeCanvas() {
@@ -273,7 +257,9 @@ resizeCanvas();
 
 // ---------- Game State ----------
 const S = {
-  running: true,
+  started: false,   // tap-to-start gate
+  running: false,   // physics only when true
+
   x: 0, y: 0, vy: 0, r: 12,
 
   gravity: 1350,
@@ -283,10 +269,10 @@ const S = {
   baseScroll: 240,
   scroll: 240,
 
-  // day/night cycle (distance-based)
-  distance: 0,
-  cycleLen: 4800,
+  // earned day/night (like dino)
   dayAmount: 0,
+  dayTarget: 0,
+  dayEvery: 700, // toggle every 700 points
 
   light: 1,
   drainOnHit: 0.28,
@@ -310,8 +296,8 @@ const S = {
   best: 0,
   passed: new Set(),
 
-  msg: "Tap / Space to rise. Stay steady.",
-  msgT: 2.0,
+  msg: "Tap to start.",
+  msgT: 999,
   lastHitT: -999,
 
   lastRunScore: 0,
@@ -333,16 +319,13 @@ function resetRun() {
   S.light = 1;
   S.scroll = S.baseScroll;
 
-  S.distance = 0;
-  S.dayAmount = 0;
-
   S.pipes = [];
   S.passed.clear();
   S.score = 0;
   S.lastGapY = null;
 
-  S.msg = "Tap / Space to rise. Stay steady.";
-  S.msgT = 2.0;
+  S.msg = "";
+  S.msgT = 0;
   S.lastHitT = -999;
   S.lastFlapT = -999;
 
@@ -415,11 +398,19 @@ function endRun() {
   showVerseOverlay({ score: S.score, best: S.best });
 }
 
-function flap() {
-  if (!verseOverlay.classList.contains("hidden")) return;
-  if (!S.running) return;
+function startGameAndFlap() {
+  // start gate
+  if (!S.started) {
+    S.started = true;
+    S.running = true;
+    resetRun();
+    // little gentle start so it feels responsive
+    S.vy = S.thrust * 0.72;
+    sfxFlap();
+    return;
+  }
 
-  ensureAudio();
+  if (!S.running) return;
 
   const t = performance.now() / 1000;
   S.lastFlapT = t;
@@ -430,11 +421,15 @@ function flap() {
   sfxFlap();
 }
 
-window.addEventListener("pointerdown", () => flap());
+window.addEventListener("pointerdown", () => {
+  if (!verseOverlay.classList.contains("hidden")) return;
+  startGameAndFlap();
+});
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space") {
     e.preventDefault();
-    flap();
+    if (!verseOverlay.classList.contains("hidden")) return;
+    startGameAndFlap();
   }
 });
 
@@ -457,54 +452,64 @@ function easeInOut(t) {
   return t * t * (3 - 2 * t);
 }
 
-function computeDayAmount() {
-  const p = (S.distance % S.cycleLen) / S.cycleLen;
-  const tri = p < 0.5 ? (p / 0.5) : (1 - (p - 0.5) / 0.5);
-  const target = easeInOut(tri);
-  S.dayAmount = lerp(S.dayAmount, target, 0.03);
+// Earned day/night: toggle every 700 points, smooth transition
+function updateDayNight() {
+  const phase = Math.floor(S.score / S.dayEvery) % 2; // 0=night, 1=day
+  S.dayTarget = phase === 1 ? 1 : 0;
+  S.dayAmount = lerp(S.dayAmount, S.dayTarget, 0.02); // slower, nicer
 }
 
 function drawBackground(w, h) {
-  // slightly lighter than pure black, keeps “night vibe”
+  const d = S.dayAmount;
+
+  // Night base (your vibe)
   ctx.fillStyle = "#171b22";
   ctx.fillRect(0, 0, w, h);
 
-  // day overlay: warm glow top-left + subtle brighten
-  const d = S.dayAmount;
-
+  // Day is now MUCH more obvious (but same style)
+  // 1) overall brighten
+  // 2) warm sun glow top-left
+  // 3) slightly bluer air tint
   if (d > 0.001) {
-    ctx.globalAlpha = 0.18 * d;
-    ctx.fillStyle = "#2a2f3a";
+    // subtle blue tint wash
+    ctx.globalAlpha = 0.28 * d;
+    ctx.fillStyle = "#2a3242";
     ctx.fillRect(0, 0, w, h);
 
-    const g = ctx.createRadialGradient(-40, -40, 0, -40, -40, Math.max(w, h) * 0.85);
-    g.addColorStop(0, "rgba(255, 210, 140, 0.55)");
-    g.addColorStop(0.35, "rgba(255, 210, 140, 0.14)");
-    g.addColorStop(1, "rgba(255, 210, 140, 0)");
-    ctx.globalAlpha = 0.55 * d;
+    // brighten overlay (more obvious than before)
+    ctx.globalAlpha = 0.24 * d;
+    ctx.fillStyle = "#3a4357";
+    ctx.fillRect(0, 0, w, h);
+
+    // warm sun glow
+    const g = ctx.createRadialGradient(-60, -60, 0, -60, -60, Math.max(w, h) * 0.95);
+    g.addColorStop(0, "rgba(255, 214, 160, 0.95)");
+    g.addColorStop(0.25, "rgba(255, 214, 160, 0.34)");
+    g.addColorStop(0.6, "rgba(255, 214, 160, 0.10)");
+    g.addColorStop(1, "rgba(255, 214, 160, 0)");
+    ctx.globalAlpha = 0.62 * d;
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
+
     ctx.globalAlpha = 1;
   }
 
-  // stars fade out during day
-  const starAlpha = 0.28 * (1 - d);
-  if (starAlpha > 0.01) {
-    ctx.globalAlpha = starAlpha;
-    ctx.fillStyle = "white";
-    for (let i = 0; i < 24; i++) {
-      const x = (i * 97 + Math.floor(performance.now() / 30)) % w;
-      const y = (i * 53) % h;
-      ctx.fillRect(x, y, 2, 2);
-    }
-    ctx.globalAlpha = 1;
+  // Stars: strong at night, almost gone in day
+  const starAlpha = 0.30 * (1 - d) + 0.03;
+  ctx.globalAlpha = starAlpha;
+  ctx.fillStyle = "white";
+  for (let i = 0; i < 24; i++) {
+    const x = (i * 97 + Math.floor(performance.now() / 30)) % w;
+    const y = (i * 53) % h;
+    ctx.fillRect(x, y, 2, 2);
   }
+  ctx.globalAlpha = 1;
 
-  // vignette keeps the style consistent
+  // vignette (keeps your style consistent)
   ctx.globalAlpha = 0.18;
   const vg = ctx.createLinearGradient(0, 0, 0, h);
-  vg.addColorStop(0, "rgba(0,0,0,0.16)");
-  vg.addColorStop(1, "rgba(0,0,0,0.45)");
+  vg.addColorStop(0, "rgba(0,0,0,0.14)");
+  vg.addColorStop(1, "rgba(0,0,0,0.44)");
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, w, h);
   ctx.globalAlpha = 1;
@@ -539,26 +544,38 @@ function draw() {
   ctx.fillStyle = "rgba(255,255,255,0.88)";
   ctx.fill();
 
-  // HUD
+  // --- HUD positioning fix (logo-safe) ---
+  // Logo sits at top center; we push HUD down so it never collides.
+  const hudTopY = 86; // <- this is the key fix
+
   ctx.font = "700 16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
   ctx.fillStyle = "rgba(255,255,255,0.88)";
-  ctx.fillText(`Score: ${S.score}`, 14, 26);
+  ctx.fillText(`Score: ${S.score}`, 14, hudTopY);
 
   ctx.font = "600 12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
   ctx.fillStyle = "rgba(255,255,255,0.62)";
-  ctx.fillText(`Best: ${S.best}`, 14, 44);
+  ctx.fillText(`Best: ${S.best}`, 14, hudTopY + 18);
 
   // light bar
-  const bx = 14, by = 56, bw = 160, bh = 10;
+  const bx = 14, by = hudTopY + 30, bw = 160, bh = 10;
   roundRectFill(bx, by, bw, bh, 999, "rgba(255,255,255,0.12)");
   roundRectFill(bx, by, bw * S.light, bh, 999, `rgba(255,255,255,${0.22 + 0.65 * S.light})`);
-  ctx.fillStyle = "rgba(255,255,255,0.62)";
-  ctx.fillText("Light", bx + bw + 10, by + 10);
 
-  if (S.msg && verseOverlay.classList.contains("hidden")) {
+  // Light label UNDER the bar (your circled spot)
+  ctx.fillStyle = "rgba(255,255,255,0.62)";
+  ctx.fillText("Light", bx, by + bh + 16);
+
+  // Start hint
+  if (!S.started && verseOverlay.classList.contains("hidden")) {
+    ctx.font = "800 16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillStyle = "rgba(255,255,255,0.88)";
+    ctx.fillText("Tap to start", 14, by + bh + 46);
+  }
+
+  if (S.msg && S.msgT > 0 && S.started && verseOverlay.classList.contains("hidden")) {
     ctx.font = "700 13px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     ctx.fillStyle = "rgba(255,255,255,0.74)";
-    ctx.fillText(S.msg, 14, 86);
+    ctx.fillText(S.msg, 14, by + bh + 46);
   }
 }
 
@@ -593,9 +610,8 @@ function update(dt) {
   const target = S.baseScroll + S.score * 4.2;
   S.scroll = target * (0.82 + 0.18 * S.light);
 
-  // distance drives day/night
-  S.distance += S.scroll * dt;
-  computeDayAmount();
+  // earned day/night
+  updateDayNight();
 
   // move pipes
   for (const p of S.pipes) p.x -= S.scroll * dt;
@@ -649,11 +665,24 @@ function loop() {
   last = now;
 
   if (S.running) update(dt);
+  else updateDayNight(); // still smooth visuals while paused
+
   draw();
   requestAnimationFrame(loop);
 }
 
 // boot
 loadBest();
+
+// Tap-to-start state: set a stable starting position (no falling)
+S.x = Math.round(window.innerWidth * 0.28);
+S.y = Math.round(window.innerHeight * 0.45);
+S.vy = 0;
+
+// pre-spawn pipes so the world is “alive” when you start
 resetRun();
+S.running = false;  // IMPORTANT: don’t run physics yet
+S.started = false;
+S.msg = "Tap to start.";
+
 loop();
