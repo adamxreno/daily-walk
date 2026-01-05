@@ -3,10 +3,20 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Daily Walk</title>
+  <title>Liiiiiiight</title>
   <link rel="stylesheet" href="style.css" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 </head>
 <body>
+  <!-- Always-visible HUD layer -->
+  <div id="hudTop" aria-hidden="true">
+    <!-- Put your updated logo file in the repo root as logo.svg -->
+    <img id="logo" src="logo.svg" alt="Liiiiiiight" />
+    <button id="soundBtn" class="iconBtn" title="Sound">🔊</button>
+  </div>
+
   <canvas id="c"></canvas>
 
   <div id="verseOverlay" class="overlay hidden" aria-hidden="true">
@@ -28,6 +38,8 @@
 
       <div class="unlockRow">
         <div class="spacer"></div>
+
+        <!-- Countdown appears here, then Continue replaces it in the exact same spot -->
         <div id="unlockHint" class="hint right">Please wait 5s…</div>
         <button id="continueBtn" class="btn rightBtn hiddenBtn" disabled>Continue</button>
       </div>
