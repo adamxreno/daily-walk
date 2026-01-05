@@ -1,86 +1,175 @@
-html, body {
-  margin: 0;
-  padding: 0;
-  background: #0b0f14;
-  overflow: hidden;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  color: white;
+:root{
+  --bg:#0b0f14;
+  --card:#151a21;
+  --card2:#0f141b;
+  --text:#ffffff;
+  --muted:rgba(255,255,255,.7);
+  --muted2:rgba(255,255,255,.55);
+  --shadow: rgba(0,0,0,.55);
+  --radius: 18px;
 }
 
-canvas {
-  display: block;
-  width: 100vw;
-  height: 100vh;
+*{ box-sizing:border-box; }
+
+html,body{
+  margin:0;
+  padding:0;
+  height:100%;
+  background:var(--bg);
+  overflow:hidden;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color:var(--text);
+}
+
+canvas{
+  display:block;
+  width:100vw;
+  height:100vh;
   touch-action: manipulation;
 }
 
-/* Logo always top center */
-#logo {
-  position: fixed;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  height: 32px;
-  z-index: 10;
-  pointer-events: none;
-  opacity: 0.95;
+/* logo always visible, screenshot friendly */
+#logo{
+  position:fixed;
+  top:14px;
+  left:50%;
+  transform:translateX(-50%);
+  height:32px;
+  z-index:10;
+  pointer-events:none;
+  opacity:.95;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,.35));
 }
 
-/* End card overlay */
-#endCard {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.65);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 20;
+/* overlay modal */
+#overlay{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background: rgba(0,0,0,.62);
+  z-index:20;
+  padding: 16px;
 }
 
-#card {
-  background: #151a21;
-  border-radius: 18px;
-  padding: 20px;
-  width: min(92%, 420px);
-  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+#card{
+  width: min(92vw, 440px);
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 70px var(--shadow);
+  border: 1px solid rgba(255,255,255,.08);
+  overflow:hidden;
 }
 
-#card h2 {
-  margin: 0 0 6px;
-  font-size: 22px;
-  font-weight: 800;
+.cardTop{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  padding:16px 16px 8px;
 }
 
-#meta {
-  opacity: 0.7;
+.titleWrap{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+
+#cardTitle{
+  font-size:22px;
+  font-weight:800;
+  letter-spacing:-.02em;
+}
+
+#cardMeta{
+  font-size:14px;
+  color: var(--muted);
+}
+
+.subline{
+  padding: 0 16px 10px;
   font-size: 14px;
-  margin-bottom: 12px;
+  color: var(--muted2);
 }
 
-#verse {
-  line-height: 1.5;
-  font-size: 16px;
-  margin-bottom: 18px;
+#verseBox{
+  margin: 0 16px 14px;
+  background: var(--card2);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px;
+  padding: 14px;
 }
 
-#actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+#verseText{
+  font-size:16px;
+  line-height:1.45;
+  color: rgba(255,255,255,.92);
+  white-space:pre-wrap;
+}
+
+#verseRef{
+  margin-top:10px;
+  font-size:15px;
+  font-weight:800;
+  color: rgba(255,255,255,.88);
+}
+
+.cardBottom{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding: 0 16px 16px;
   gap: 10px;
 }
 
-button {
-  background: #fff;
-  color: #000;
-  border: none;
-  padding: 10px 14px;
-  border-radius: 10px;
-  font-weight: 700;
-  cursor: pointer;
+.rightSlot{
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  min-width: 160px;
 }
 
-#countdown {
-  opacity: 0.75;
-  font-size: 14px;
+.pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.10);
+  color: rgba(255,255,255,.85);
+  font-weight:700;
+  font-size:14px;
+  min-width: 140px;
+  text-align:center;
+}
+
+.primaryBtn{
+  background:#fff;
+  color:#000;
+  border:none;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-weight:800;
+  font-size:14px;
+  cursor:pointer;
+  min-width: 140px;
+}
+
+.ghostBtn{
+  background: rgba(255,255,255,.10);
+  color: rgba(255,255,255,.92);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 999px;
+  padding: 9px 12px;
+  font-weight:800;
+  font-size:13px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+
+/* Make the share button feel tappable on mobile */
+button:active{
+  transform: translateY(1px);
 }
