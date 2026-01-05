@@ -1,10 +1,10 @@
-// Daily Walk — WEB Daily Verse (no translation shown) + Send to Friends + 5s Lock + Guaranteed Pipe Spacing
-
+// Liiiiiiight — Day/Night Cycle + Soft Sounds + Logo HUD + Daily Verse (WEB public domain wording)
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
 // ---------- Utilities ----------
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
 
 function mulberry32(seed) {
   return function () {
@@ -47,7 +47,10 @@ const sendBtn = document.getElementById("sendBtn");
 const shareStatus = document.getElementById("shareStatus");
 const resultText = document.getElementById("resultText");
 
-// WEB verses (public domain) — short + uplifting
+// Sound button
+const soundBtn = document.getElementById("soundBtn");
+
+// WEB (public domain) wording
 const VERSES_WEB = [
   {
     ref: "Philippians 4:6–7",
@@ -115,7 +118,7 @@ function showVerseOverlay({ score, best }) {
   resultText.textContent = `Score: ${score} • Best: ${best}`;
   shareStatus.textContent = "";
 
-  // Lock Continue for 5 seconds
+  // Lock Continue for 5 seconds, then swap countdown -> Continue in same spot
   continueBtn.disabled = true;
   continueBtn.classList.add("hiddenBtn");
   unlockHint.textContent = "Please wait 5s…";
@@ -140,7 +143,6 @@ function tickUnlock() {
   const left = Math.ceil(leftMs / 1000);
 
   if (leftMs <= 0) {
-    // Countdown disappears, Continue appears in SAME spot (right side)
     unlockHint.style.display = "none";
     continueBtn.classList.remove("hiddenBtn");
     continueBtn.disabled = false;
@@ -161,7 +163,7 @@ continueBtn.addEventListener("click", () => {
 // ---------- “Send to your friends!” ----------
 const GAME_URL = "https://adamxreno.github.io/daily-walk/";
 function buildInviteMessage() {
-  return `I love this new game and think you will too!! 👀 ${GAME_URL}`;
+  return `I love this new game (Liiiiiiight) and think you will too!! 👀 ${GAME_URL}`;
 }
 
 async function sendToFriends() {
@@ -169,19 +171,17 @@ async function sendToFriends() {
 
   if (navigator.share) {
     try {
-      await navigator.share({ text, url: GAME_URL, title: "Daily Walk" });
+      await navigator.share({ text, url: GAME_URL, title: "Liiiiiiight" });
       shareStatus.textContent = "";
       return;
     } catch {
-      // user cancelled or browser blocked — fall through
+      // user cancelled or blocked
     }
   }
 
-  // Fallback: open SMS composer
   const smsUrl = `sms:&body=${encodeURIComponent(text)}`;
   const opened = window.open(smsUrl, "_self");
 
-  // Last fallback: copy
   if (!opened && navigator.clipboard) {
     try {
       await navigator.clipboard.writeText(text);
@@ -193,6 +193,73 @@ async function sendToFriends() {
   }
 }
 sendBtn.addEventListener("click", sendToFriends);
+
+// ---------- Sound (quick + pleasant, not annoying) ----------
+let audio = {
+  enabled: true,
+  ctx: null,
+  master: null,
+  ready: false,
+};
+
+function ensureAudio() {
+  if (!audio.enabled) return;
+  if (audio.ready) return;
+
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return;
+
+  audio.ctx = new Ctx();
+  audio.master = audio.ctx.createGain();
+  audio.master.gain.value = 0.22;
+  audio.master.connect(audio.ctx.destination);
+  audio.ready = true;
+}
+
+function playTone({ type="sine", freq=440, dur=0.06, gain=0.08, attack=0.002, release=0.03 }) {
+  if (!audio.enabled) return;
+  ensureAudio();
+  if (!audio.ready) return;
+
+  const t0 = audio.ctx.currentTime;
+  const osc = audio.ctx.createOscillator();
+  const g = audio.ctx.createGain();
+
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.linearRampToValueAtTime(gain, t0 + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + release);
+
+  osc.connect(g);
+  g.connect(audio.master);
+
+  osc.start(t0);
+  osc.stop(t0 + dur + release + 0.01);
+}
+
+function sfxFlap() {
+  playTone({ type:"triangle", freq: 880, dur: 0.035, gain: 0.06, release: 0.02 });
+  playTone({ type:"triangle", freq: 1320, dur: 0.030, gain: 0.05, release: 0.02 });
+}
+function sfxHit() {
+  playTone({ type:"sine", freq: 150, dur: 0.045, gain: 0.08, release: 0.04 });
+}
+function sfxScore() {
+  playTone({ type:"sine", freq: 660, dur: 0.03, gain: 0.045, release: 0.02 });
+}
+
+function updateSoundButton() {
+  soundBtn.textContent = audio.enabled ? "🔊" : "🔇";
+}
+soundBtn.addEventListener("click", () => {
+  audio.enabled = !audio.enabled;
+  if (!audio.enabled && audio.master) audio.master.gain.value = 0.0;
+  if (audio.enabled && audio.master) audio.master.gain.value = 0.22;
+  updateSoundButton();
+});
+updateSoundButton();
 
 // ---------- Canvas sizing ----------
 function resizeCanvas() {
@@ -215,6 +282,11 @@ const S = {
 
   baseScroll: 240,
   scroll: 240,
+
+  // day/night cycle (distance-based)
+  distance: 0,
+  cycleLen: 4800,
+  dayAmount: 0,
 
   light: 1,
   drainOnHit: 0.28,
@@ -260,6 +332,9 @@ function resetRun() {
 
   S.light = 1;
   S.scroll = S.baseScroll;
+
+  S.distance = 0;
+  S.dayAmount = 0;
 
   S.pipes = [];
   S.passed.clear();
@@ -323,6 +398,8 @@ function hit() {
   S.msg = "You slipped. Try again steady.";
   S.msgT = 1.0;
 
+  sfxHit();
+
   if (S.light <= 0.001) endRun();
 }
 
@@ -342,11 +419,15 @@ function flap() {
   if (!verseOverlay.classList.contains("hidden")) return;
   if (!S.running) return;
 
+  ensureAudio();
+
   const t = performance.now() / 1000;
   S.lastFlapT = t;
 
   const strength = 0.88 + 0.28 * S.light;
   S.vy = S.thrust * strength;
+
+  sfxFlap();
 }
 
 window.addEventListener("pointerdown", () => flap());
@@ -372,22 +453,70 @@ function roundRectFill(x, y, w, h, r, fillStyle) {
   ctx.fill();
 }
 
+function easeInOut(t) {
+  return t * t * (3 - 2 * t);
+}
+
+function computeDayAmount() {
+  const p = (S.distance % S.cycleLen) / S.cycleLen;
+  const tri = p < 0.5 ? (p / 0.5) : (1 - (p - 0.5) / 0.5);
+  const target = easeInOut(tri);
+  S.dayAmount = lerp(S.dayAmount, target, 0.03);
+}
+
+function drawBackground(w, h) {
+  // slightly lighter than pure black, keeps “night vibe”
+  ctx.fillStyle = "#171b22";
+  ctx.fillRect(0, 0, w, h);
+
+  // day overlay: warm glow top-left + subtle brighten
+  const d = S.dayAmount;
+
+  if (d > 0.001) {
+    ctx.globalAlpha = 0.18 * d;
+    ctx.fillStyle = "#2a2f3a";
+    ctx.fillRect(0, 0, w, h);
+
+    const g = ctx.createRadialGradient(-40, -40, 0, -40, -40, Math.max(w, h) * 0.85);
+    g.addColorStop(0, "rgba(255, 210, 140, 0.55)");
+    g.addColorStop(0.35, "rgba(255, 210, 140, 0.14)");
+    g.addColorStop(1, "rgba(255, 210, 140, 0)");
+    ctx.globalAlpha = 0.55 * d;
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalAlpha = 1;
+  }
+
+  // stars fade out during day
+  const starAlpha = 0.28 * (1 - d);
+  if (starAlpha > 0.01) {
+    ctx.globalAlpha = starAlpha;
+    ctx.fillStyle = "white";
+    for (let i = 0; i < 24; i++) {
+      const x = (i * 97 + Math.floor(performance.now() / 30)) % w;
+      const y = (i * 53) % h;
+      ctx.fillRect(x, y, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // vignette keeps the style consistent
+  ctx.globalAlpha = 0.18;
+  const vg = ctx.createLinearGradient(0, 0, 0, h);
+  vg.addColorStop(0, "rgba(0,0,0,0.16)");
+  vg.addColorStop(1, "rgba(0,0,0,0.45)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalAlpha = 1;
+}
+
 function draw() {
   const w = window.innerWidth;
   const h = window.innerHeight;
 
-  ctx.fillStyle = "#171b22";
-  ctx.fillRect(0, 0, w, h);
+  drawBackground(w, h);
 
-  ctx.globalAlpha = 0.28;
-  ctx.fillStyle = "white";
-  for (let i = 0; i < 24; i++) {
-    const x = (i * 97 + Math.floor(performance.now() / 30)) % w;
-    const y = (i * 53) % h;
-    ctx.fillRect(x, y, 2, 2);
-  }
-  ctx.globalAlpha = 1;
-
+  // pipes (no visible outlines)
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
@@ -395,6 +524,7 @@ function draw() {
     roundRectFill(p.x, gapBot, p.w, h - gapBot, 12, "rgba(0,0,0,0.72)");
   }
 
+  // player glow
   const glow = 16 + 30 * S.light;
   const alpha = 0.20 + 0.55 * S.light;
 
@@ -403,11 +533,13 @@ function draw() {
   ctx.fillStyle = `rgba(255,255,255,${alpha * 0.12})`;
   ctx.fill();
 
+  // player
   ctx.beginPath();
   ctx.arc(S.x, S.y, S.r, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(255,255,255,0.88)";
   ctx.fill();
 
+  // HUD
   ctx.font = "700 16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
   ctx.fillStyle = "rgba(255,255,255,0.88)";
   ctx.fillText(`Score: ${S.score}`, 14, 26);
@@ -416,6 +548,7 @@ function draw() {
   ctx.fillStyle = "rgba(255,255,255,0.62)";
   ctx.fillText(`Best: ${S.best}`, 14, 44);
 
+  // light bar
   const bx = 14, by = 56, bw = 160, bh = 10;
   roundRectFill(bx, by, bw, bh, 999, "rgba(255,255,255,0.12)");
   roundRectFill(bx, by, bw * S.light, bh, 999, `rgba(255,255,255,${0.22 + 0.65 * S.light})`);
@@ -427,14 +560,6 @@ function draw() {
     ctx.fillStyle = "rgba(255,255,255,0.74)";
     ctx.fillText(S.msg, 14, 86);
   }
-
-  ctx.globalAlpha = 0.18;
-  const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, "rgba(0,0,0,0.16)");
-  g.addColorStop(1, "rgba(0,0,0,0.45)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, h);
-  ctx.globalAlpha = 1;
 }
 
 // ---------- Guaranteed spacing ----------
@@ -464,28 +589,29 @@ let last = performance.now();
 function update(dt) {
   const h = window.innerHeight;
 
+  // speed
   const target = S.baseScroll + S.score * 4.2;
   S.scroll = target * (0.82 + 0.18 * S.light);
 
+  // distance drives day/night
+  S.distance += S.scroll * dt;
+  computeDayAmount();
+
+  // move pipes
   for (const p of S.pipes) p.x -= S.scroll * dt;
   S.pipes = S.pipes.filter(p => p.x + p.w > -140);
-
   ensurePipesAhead();
 
+  // player physics
   S.vy += S.gravity * dt;
   S.vy = clamp(S.vy, -1200, S.maxFall);
   S.y += S.vy * dt;
 
-  if (S.y < S.r) {
-    S.y = S.r;
-    S.vy *= -0.25;
-    hit();
-  }
-  if (S.y > h - S.r) {
-    S.y = h - S.r;
-    hit();
-  }
+  // bounds = slip
+  if (S.y < S.r) { S.y = S.r; S.vy *= -0.25; hit(); }
+  if (S.y > h - S.r) { S.y = h - S.r; hit(); }
 
+  // collisions + scoring
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
@@ -497,9 +623,11 @@ function update(dt) {
     if (!S.passed.has(p.id) && p.x + p.w < S.x - S.r) {
       S.passed.add(p.id);
       S.score += 1;
+      sfxScore();
     }
   }
 
+  // regen
   const t = performance.now() / 1000;
   const calm = Math.abs(S.vy) < 260;
   const coasting = (t - S.lastFlapT) >= S.regenCoastGateSec;
@@ -525,6 +653,7 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
+// boot
 loadBest();
 resetRun();
 loop();
