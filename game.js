@@ -1,4 +1,5 @@
-// Liiiiiiight — earned day/night + tap-to-start + daily verse + send-to-friends + soft sound
+// game.js
+// Liiiiiiight — earned day/night + BIG tap-to-start + daily verse + send-to-friends + soft sound
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
@@ -234,7 +235,6 @@ function playTone({ type="sine", freq=440, dur=0.06, gain=0.08, attack=0.002, re
 }
 
 function sfxFlap() {
-  // quick “seatbelt-ish” chirp, very short
   playTone({ type:"triangle", freq: 880, dur: 0.032, gain: 0.06, release: 0.02 });
   playTone({ type:"triangle", freq: 1320, dur: 0.028, gain: 0.05, release: 0.02 });
 }
@@ -269,10 +269,10 @@ const S = {
   baseScroll: 240,
   scroll: 240,
 
-  // earned day/night (like dino)
+  // earned day/night (toggle every 70 points)
   dayAmount: 0,
   dayTarget: 0,
-  dayEvery: 700, // toggle every 700 points
+  dayEvery: 70,
 
   light: 1,
   drainOnHit: 0.28,
@@ -399,12 +399,10 @@ function endRun() {
 }
 
 function startGameAndFlap() {
-  // start gate
   if (!S.started) {
     S.started = true;
     S.running = true;
     resetRun();
-    // little gentle start so it feels responsive
     S.vy = S.thrust * 0.72;
     sfxFlap();
     return;
@@ -448,40 +446,28 @@ function roundRectFill(x, y, w, h, r, fillStyle) {
   ctx.fill();
 }
 
-function easeInOut(t) {
-  return t * t * (3 - 2 * t);
-}
-
-// Earned day/night: toggle every 700 points, smooth transition
+// Earned day/night: toggle every 70 points, smooth transition
 function updateDayNight() {
   const phase = Math.floor(S.score / S.dayEvery) % 2; // 0=night, 1=day
   S.dayTarget = phase === 1 ? 1 : 0;
-  S.dayAmount = lerp(S.dayAmount, S.dayTarget, 0.02); // slower, nicer
+  S.dayAmount = lerp(S.dayAmount, S.dayTarget, 0.02);
 }
 
 function drawBackground(w, h) {
   const d = S.dayAmount;
 
-  // Night base (your vibe)
   ctx.fillStyle = "#171b22";
   ctx.fillRect(0, 0, w, h);
 
-  // Day is now MUCH more obvious (but same style)
-  // 1) overall brighten
-  // 2) warm sun glow top-left
-  // 3) slightly bluer air tint
   if (d > 0.001) {
-    // subtle blue tint wash
     ctx.globalAlpha = 0.28 * d;
     ctx.fillStyle = "#2a3242";
     ctx.fillRect(0, 0, w, h);
 
-    // brighten overlay (more obvious than before)
     ctx.globalAlpha = 0.24 * d;
     ctx.fillStyle = "#3a4357";
     ctx.fillRect(0, 0, w, h);
 
-    // warm sun glow
     const g = ctx.createRadialGradient(-60, -60, 0, -60, -60, Math.max(w, h) * 0.95);
     g.addColorStop(0, "rgba(255, 214, 160, 0.95)");
     g.addColorStop(0.25, "rgba(255, 214, 160, 0.34)");
@@ -494,7 +480,6 @@ function drawBackground(w, h) {
     ctx.globalAlpha = 1;
   }
 
-  // Stars: strong at night, almost gone in day
   const starAlpha = 0.30 * (1 - d) + 0.03;
   ctx.globalAlpha = starAlpha;
   ctx.fillStyle = "white";
@@ -505,7 +490,6 @@ function drawBackground(w, h) {
   }
   ctx.globalAlpha = 1;
 
-  // vignette (keeps your style consistent)
   ctx.globalAlpha = 0.18;
   const vg = ctx.createLinearGradient(0, 0, 0, h);
   vg.addColorStop(0, "rgba(0,0,0,0.14)");
@@ -544,9 +528,8 @@ function draw() {
   ctx.fillStyle = "rgba(255,255,255,0.88)";
   ctx.fill();
 
-  // --- HUD positioning fix (logo-safe) ---
-  // Logo sits at top center; we push HUD down so it never collides.
-  const hudTopY = 86; // <- this is the key fix
+  // HUD (logo-safe)
+  const hudTopY = 86;
 
   ctx.font = "700 16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
   ctx.fillStyle = "rgba(255,255,255,0.88)";
@@ -561,18 +544,33 @@ function draw() {
   roundRectFill(bx, by, bw, bh, 999, "rgba(255,255,255,0.12)");
   roundRectFill(bx, by, bw * S.light, bh, 999, `rgba(255,255,255,${0.22 + 0.65 * S.light})`);
 
-  // Light label UNDER the bar (your circled spot)
+  // Light label UNDER the bar
   ctx.fillStyle = "rgba(255,255,255,0.62)";
   ctx.fillText("Light", bx, by + bh + 16);
 
-  // Start hint
+  // BIG tap to start (center-left)
   if (!S.started && verseOverlay.classList.contains("hidden")) {
+    const tx = Math.round(w * 0.22);
+    const ty = Math.round(h * 0.60);
+
+    const bg = ctx.createRadialGradient(tx, ty - 10, 0, tx, ty - 10, 220);
+    bg.addColorStop(0, "rgba(0,0,0,0.45)");
+    bg.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = bg;
+    ctx.fillRect(tx - 260, ty - 120, 520, 240);
+
+    ctx.textAlign = "left";
+    ctx.font = "900 44px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.fillText("Tap to start", tx, ty);
+
     ctx.font = "800 16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillStyle = "rgba(255,255,255,0.88)";
-    ctx.fillText("Tap to start", 14, by + bh + 46);
+    ctx.fillStyle = "rgba(255,255,255,0.62)";
+    ctx.fillText("Tap anywhere • Spacebar works too", tx, ty + 28);
   }
 
   if (S.msg && S.msgT > 0 && S.started && verseOverlay.classList.contains("hidden")) {
+    ctx.textAlign = "left";
     ctx.font = "700 13px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     ctx.fillStyle = "rgba(255,255,255,0.74)";
     ctx.fillText(S.msg, 14, by + bh + 46);
@@ -606,28 +604,22 @@ let last = performance.now();
 function update(dt) {
   const h = window.innerHeight;
 
-  // speed
   const target = S.baseScroll + S.score * 4.2;
   S.scroll = target * (0.82 + 0.18 * S.light);
 
-  // earned day/night
   updateDayNight();
 
-  // move pipes
   for (const p of S.pipes) p.x -= S.scroll * dt;
   S.pipes = S.pipes.filter(p => p.x + p.w > -140);
   ensurePipesAhead();
 
-  // player physics
   S.vy += S.gravity * dt;
   S.vy = clamp(S.vy, -1200, S.maxFall);
   S.y += S.vy * dt;
 
-  // bounds = slip
   if (S.y < S.r) { S.y = S.r; S.vy *= -0.25; hit(); }
   if (S.y > h - S.r) { S.y = h - S.r; hit(); }
 
-  // collisions + scoring
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
@@ -643,7 +635,6 @@ function update(dt) {
     }
   }
 
-  // regen
   const t = performance.now() / 1000;
   const calm = Math.abs(S.vy) < 260;
   const coasting = (t - S.lastFlapT) >= S.regenCoastGateSec;
@@ -665,13 +656,26 @@ function loop() {
   last = now;
 
   if (S.running) update(dt);
-  else updateDayNight(); // still smooth visuals while paused
+  else updateDayNight();
 
   draw();
   requestAnimationFrame(loop);
 }
 
 // boot
+(function init() {
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  canvas.width = Math.floor(window.innerWidth * dpr);
+  canvas.height = Math.floor(window.innerHeight * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+})();
+window.addEventListener("resize", () => {
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  canvas.width = Math.floor(window.innerWidth * dpr);
+  canvas.height = Math.floor(window.innerHeight * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+});
+
 loadBest();
 
 // Tap-to-start state: set a stable starting position (no falling)
@@ -679,9 +683,8 @@ S.x = Math.round(window.innerWidth * 0.28);
 S.y = Math.round(window.innerHeight * 0.45);
 S.vy = 0;
 
-// pre-spawn pipes so the world is “alive” when you start
 resetRun();
-S.running = false;  // IMPORTANT: don’t run physics yet
+S.running = false;
 S.started = false;
 S.msg = "Tap to start.";
 
