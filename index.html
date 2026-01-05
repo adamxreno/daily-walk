@@ -1,50 +1,51 @@
-<!-- index.html -->
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>Liiiiiiight</title>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-</head>
-<body>
-  <!-- Always-visible header (logo only) -->
-  <div id="hudTop" aria-hidden="true">
-    <img id="logo" src="logo.svg" alt="Liiiiiiight" />
-  </div>
 
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <!-- Top centered logo -->
+  <img id="logo" src="logo.svg" alt="Liiiiiiight" />
+
+  <!-- Canvas -->
   <canvas id="c"></canvas>
 
-  <div id="verseOverlay" class="overlay hidden" aria-hidden="true">
-    <div class="card">
-      <div class="cardTitle" id="cardTitle">It’s okay, try again.</div>
-
-      <div class="cardSub">
-        <span id="dailyTag">Here’s your daily verse 👍🏼</span> • <span id="dateText">Jan 1, 2026</span>
+  <!-- Verse / end card overlay -->
+  <div id="overlay" aria-hidden="true">
+    <div id="card" role="dialog" aria-modal="true" aria-label="Daily verse">
+      <div class="cardTop">
+        <div class="titleWrap">
+          <div id="cardTitle">It’s okay, try again.</div>
+          <div id="cardMeta">Here’s your daily verse 👍🏼</div>
+        </div>
+        <button id="shareBtn" class="ghostBtn" type="button">Send to your friends!</button>
       </div>
 
-      <div class="resultRow">
-        <div class="resultText" id="resultText">Score: 0 • Best: 0</div>
-        <button id="sendBtn" class="btnSecondary">Send to your friends!</button>
+      <div id="cardSub" class="subline"></div>
+
+      <div id="verseBox">
+        <div id="verseText"></div>
+        <div id="verseRef"></div>
       </div>
 
-      <div class="scrollBox">
-        <div id="verseText" class="verseText"></div>
+      <div class="cardBottom">
+        <div id="spacer"></div>
+
+        <!-- Right side: countdown → Continue appears in same place -->
+        <div class="rightSlot">
+          <div id="countdownPill" class="pill">Continue in 5s</div>
+          <button id="continueBtn" class="primaryBtn" type="button" style="display:none;">Continue</button>
+        </div>
       </div>
-
-      <div class="unlockRow">
-        <div class="spacer"></div>
-
-        <!-- Countdown appears here, then Continue replaces it in the exact same spot -->
-        <div id="unlockHint" class="hint right">Please wait 5s…</div>
-        <button id="continueBtn" class="btn rightBtn hiddenBtn" disabled>Continue</button>
-      </div>
-
-      <div class="shareStatus" id="shareStatus"></div>
     </div>
   </div>
 
-  <script src="game.js"></script>
+  <script src="game.js" defer></script>
 </body>
 </html>
