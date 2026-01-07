@@ -1,5 +1,7 @@
 // game.js
 // Liiiiiiight — earned day/night + BIG tap-to-start + daily verse + send-to-friends + soft sound
+// Updates: revert to tubes, keep bread/milk, upgrade bread/milk drawings, keep plateau speed + post-jump grace + hold-jump
+
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
@@ -245,8 +247,8 @@ function sfxScore() {
   playTone({ type:"sine", freq: 660, dur: 0.03, gain: 0.045, release: 0.02 });
 }
 function sfxPowerup() {
-  playTone({ type:"sine", freq: 880, dur: 0.03, gain: 0.05, release: 0.02 });
-  playTone({ type:"sine", freq: 1180, dur: 0.03, gain: 0.04, release: 0.02 });
+  playTone({ type:"sine", freq: 900, dur: 0.03, gain: 0.05, release: 0.02 });
+  playTone({ type:"sine", freq: 1200, dur: 0.03, gain: 0.04, release: 0.02 });
 }
 
 // ---------- Canvas sizing ----------
@@ -270,14 +272,14 @@ const S = {
   thrust: -420,
   maxFall: 900,
 
-  // --- NEW: post-jump “float forgiveness”
+  // post-jump “float forgiveness”
   postJumpGraceMs: 150,
   postJumpGravityScale: 0.72,
   postJumpUntilMs: 0,
 
-  // --- NEW: speed plateau
+  // speed plateau
   baseScroll: 240,
-  maxScroll: 310,        // plateau
+  maxScroll: 310,
   scrollRampPerScore: 2.8,
   scroll: 240,
 
@@ -286,7 +288,6 @@ const S = {
   dayTarget: 0,
   dayEvery: 40,
 
-  // Light system
   light: 1,
   lightMax: 1.0,
   lightMaxOver: 1.5,
@@ -297,7 +298,6 @@ const S = {
   lastFlapT: -999,
   overchargeUntilMs: 0,
 
-  // pipes/clouds
   pipes: [],
   pipeW: 78,
   gapBase: 188,
@@ -319,11 +319,11 @@ const S = {
 
   lastRunScore: 0,
 
-  // --- NEW: powerups
+  // powerups
   powerups: [], // {id,x,y,r,type,taken}
   powerupId: 0,
 
-  // --- NEW: press/hold jump
+  // press/hold jump
   holdActive: false,
   holdStartMs: 0,
   maxHoldMs: 140,
@@ -375,16 +375,15 @@ function smoothGapY(targetGapY) {
 }
 
 function maybeSpawnPowerup(pipe) {
-  // Slightly dangerous positions: near the gap edges
-  // Bread more common than milk.
+  // powerups spawn in slightly dangerous positions near gap edges
   const chance = 0.22;
   if (Math.random() > chance) return;
 
   const edgeOffset = 24; // smaller = riskier
-  const side = Math.random() < 0.5 ? -1 : 1;
+  const side = Math.random() < 0.5 ? -1 : 1; // top-edge or bottom-edge
   const y = pipe.gapY + side * (pipe.gapH / 2 - edgeOffset);
 
-  const type = Math.random() < 0.72 ? "bread" : "milk";
+  const type = Math.random() < 0.72 ? "bread" : "milk"; // milk rarer
   S.powerups.push({
     id: S.powerupId++,
     x: pipe.x + pipe.w * 0.5,
@@ -413,7 +412,6 @@ function spawnPipe(x) {
   const pipe = { id: S.pipeId++, x, w: S.pipeW, gapY, gapH: gap };
   S.pipes.push(pipe);
 
-  // NEW: chance to spawn a powerup with this pipe
   maybeSpawnPowerup(pipe);
 }
 
@@ -453,7 +451,7 @@ function endRun() {
   showVerseOverlay({ score: S.score, best: S.best });
 }
 
-// --- NEW: unified jump function with post-jump grace
+// unified jump function with post-jump grace
 function doJump(strengthScale = 1) {
   const t = performance.now() / 1000;
   S.lastFlapT = t;
@@ -467,13 +465,12 @@ function doJump(strengthScale = 1) {
   sfxFlap();
 }
 
-// Tap-to-start should start instantly, then your *first* jump happens immediately.
+// Tap-to-start should start instantly, then your first jump happens immediately.
 function startGameAndInitialJump() {
   if (!S.started) {
     S.started = true;
     S.running = true;
     resetRun();
-    // a slightly softer first jump so it feels controlled
     S.vy = S.thrust * 0.72;
     S.postJumpUntilMs = performance.now() + S.postJumpGraceMs;
     sfxFlap();
@@ -484,7 +481,6 @@ function startGameAndInitialJump() {
 function beginHold() {
   if (!verseOverlay.classList.contains("hidden")) return;
 
-  // Start game if not started
   if (!S.started) {
     startGameAndInitialJump();
     return;
@@ -506,7 +502,7 @@ function endHoldAndJump() {
   const clamped = clamp(held, 0, S.maxHoldMs);
   const t = clamped / S.maxHoldMs;
 
-  // smoothstep easing (feels nicer than linear)
+  // smoothstep easing
   const eased = t * t * (3 - 2 * t);
   const scale = S.minJumpScale + (S.maxJumpScale - S.minJumpScale) * eased;
 
@@ -553,65 +549,74 @@ function roundRectFill(x, y, w, h, r, fillStyle) {
   ctx.fill();
 }
 
-// NEW: cloud drawing (keeps same style, but clearly not flappy pipes)
-function drawCloud(x, y, w, h) {
-  if (h <= 0 || w <= 0) return;
-
-  const d = S.dayAmount;
-
-  // base
-  ctx.save();
-  ctx.globalAlpha = 1;
-
-  // subtle shadow
-  ctx.shadowBlur = 18;
-  ctx.shadowColor = "rgba(0,0,0,0.22)";
-  ctx.shadowOffsetY = 8;
-
-  // cloud fill varies by day/night
-  const fill = d > 0.5 ? "rgba(255,255,255,0.62)" : "rgba(255,255,255,0.18)";
-  roundRectFill(x, y, w, h, 22, fill);
-
-  // highlight strip
-  ctx.shadowBlur = 0;
-  ctx.globalAlpha = d > 0.4 ? 0.28 : 0.18;
-  roundRectFill(x + 6, y + 6, w * 0.52, Math.max(10, h * 0.20), 18, "rgba(255,255,255,0.95)");
-
-  ctx.restore();
-}
-
+// Upgraded powerup drawings (no image files required)
 function drawPowerup(u) {
   if (u.taken) return;
 
-  ctx.save();
-  ctx.globalAlpha = 0.92;
+  const isBread = u.type === "bread";
+  const isMilk = u.type === "milk";
 
-  // subtle glow
+  ctx.save();
+
+  // soft glow halo
+  ctx.globalAlpha = 1;
   ctx.beginPath();
-  ctx.arc(u.x, u.y, u.r + 10, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  ctx.arc(u.x, u.y, u.r + 14, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.07)";
   ctx.fill();
 
-  // icon base
+  // base chip
+  ctx.beginPath();
+  ctx.arc(u.x, u.y, u.r + 2, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.fill();
+
+  // inner disc
   ctx.beginPath();
   ctx.arc(u.x, u.y, u.r, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(255,255,255,0.16)";
   ctx.fill();
 
-  // simple glyphs
-  ctx.globalAlpha = 0.85;
-  ctx.fillStyle = "rgba(255,255,255,0.86)";
+  if (isBread) {
+    // loaf silhouette
+    ctx.globalAlpha = 0.92;
+    roundRectFill(u.x - 11, u.y - 7, 22, 14, 9, "rgba(255,255,255,0.90)");
 
-  if (u.type === "bread") {
-    // bread: rounded loaf
-    roundRectFill(u.x - 9, u.y - 7, 18, 14, 8, "rgba(255,255,255,0.86)");
-    ctx.globalAlpha = 0.35;
-    roundRectFill(u.x - 7, u.y - 2, 14, 3, 6, "rgba(0,0,0,0.35)");
-  } else {
-    // milk: tiny jug
-    roundRectFill(u.x - 7, u.y - 8, 14, 16, 5, "rgba(255,255,255,0.86)");
-    ctx.globalAlpha = 0.35;
-    roundRectFill(u.x - 4, u.y - 10, 8, 4, 3, "rgba(255,255,255,0.65)");
+    // loaf top bump / highlight
+    ctx.globalAlpha = 0.55;
+    roundRectFill(u.x - 10, u.y - 10, 20, 8, 8, "rgba(255,255,255,0.70)");
+
+    // little bread cuts
+    ctx.globalAlpha = 0.25;
+    roundRectFill(u.x - 6, u.y - 3, 3, 6, 999, "rgba(0,0,0,0.45)");
+    roundRectFill(u.x - 1, u.y - 3, 3, 6, 999, "rgba(0,0,0,0.45)");
+    roundRectFill(u.x + 4, u.y - 3, 3, 6, 999, "rgba(0,0,0,0.45)");
+  }
+
+  if (isMilk) {
+    // jug body
+    ctx.globalAlpha = 0.92;
+    roundRectFill(u.x - 8, u.y - 9, 16, 18, 5, "rgba(255,255,255,0.92)");
+
+    // cap
+    ctx.globalAlpha = 0.70;
+    roundRectFill(u.x - 5, u.y - 12, 10, 5, 3, "rgba(255,255,255,0.78)");
+
+    // label band
+    ctx.globalAlpha = 0.22;
+    roundRectFill(u.x - 6, u.y - 1, 12, 5, 3, "rgba(0,0,0,0.55)");
+
+    // shine strip
+    ctx.globalAlpha = 0.28;
+    roundRectFill(u.x - 6.5, u.y - 7, 3, 12, 999, "rgba(255,255,255,0.90)");
+
+    // subtle ring hint
+    ctx.globalAlpha = 0.30;
+    ctx.beginPath();
+    ctx.arc(u.x, u.y, u.r + 5, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,255,255,0.45)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
 
   ctx.restore();
@@ -676,12 +681,12 @@ function draw() {
 
   drawBackground(w, h);
 
-  // clouds instead of pipes
+  // tubes (no visible outlines) — reverted from clouds
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
-    drawCloud(p.x, 0, p.w, gapTop);
-    drawCloud(p.x, gapBot, p.w, h - gapBot);
+    roundRectFill(p.x, 0, p.w, gapTop, 12, "rgba(0,0,0,0.72)");
+    roundRectFill(p.x, gapBot, p.w, h - gapBot, 12, "rgba(0,0,0,0.72)");
   }
 
   // powerups
@@ -721,7 +726,7 @@ function draw() {
   const baseFill = clamp(S.light, 0, 1);
   roundRectFill(bx, by, bw * baseFill, bh, 999, `rgba(255,255,255,${0.22 + 0.65 * baseFill})`);
 
-  // overcharge part (1.0 -> 1.5)
+  // overcharge (1.0 -> 1.5)
   if (S.light > 1.0001) {
     const extra = clamp(S.light - 1, 0, 0.5) / 0.5; // 0..1
     ctx.globalAlpha = 0.55;
@@ -783,10 +788,10 @@ let last = performance.now();
 function update(dt) {
   const h = window.innerHeight;
 
-  // --- NEW: plateau speed instead of endless ramp
+  // plateau speed instead of endless ramp
   const targetScroll = Math.min(S.maxScroll, S.baseScroll + S.score * S.scrollRampPerScore);
 
-  // keep your “light affects speed” vibe, but make it subtler so it’s fair
+  // keep light affects speed vibe, but subtle
   const lightSpeedFactor = 0.90 + 0.10 * clamp(S.light, 0, 1);
   S.scroll = targetScroll * lightSpeedFactor;
 
@@ -799,7 +804,7 @@ function update(dt) {
   for (const u of S.powerups) u.x -= S.scroll * dt;
   S.powerups = S.powerups.filter(u => u.x + 60 > -140);
 
-  // --- NEW: post-jump gravity grace
+  // post-jump gravity grace
   const nowMs = performance.now();
   const gScale = nowMs < S.postJumpUntilMs ? S.postJumpGravityScale : 1.0;
 
@@ -810,17 +815,13 @@ function update(dt) {
   if (S.y < S.r) { S.y = S.r; S.vy *= -0.25; hit(); }
   if (S.y > h - S.r) { S.y = h - S.r; hit(); }
 
-  // collisions
-  const forgiving = 8; // makes clouds feel “soft” without making it easy
+  // collisions (no “soft clouds” now — tubes are strict like before)
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
 
-    const rx = p.x + forgiving;
-    const rw = p.w - forgiving * 2;
-
-    const hitTop = circleRectCollide(S.x, S.y, S.r, rx, 0, rw, gapTop);
-    const hitBot = circleRectCollide(S.x, S.y, S.r, rx, gapBot, rw, h - gapBot);
+    const hitTop = circleRectCollide(S.x, S.y, S.r, p.x, 0, p.w, gapTop);
+    const hitBot = circleRectCollide(S.x, S.y, S.r, p.x, gapBot, p.w, h - gapBot);
     if (hitTop || hitBot) hit();
 
     if (!S.passed.has(p.id) && p.x + p.w < S.x - S.r) {
@@ -850,7 +851,7 @@ function update(dt) {
     }
   }
 
-  // regen (still clamps, but allows overcharge to slowly fall back to 1)
+  // regen (allows overcharge, then decays back to 1)
   const t = performance.now() / 1000;
   const calm = Math.abs(S.vy) < 260;
   const coasting = (t - S.lastFlapT) >= S.regenCoastGateSec;
@@ -858,11 +859,9 @@ function update(dt) {
   let regen = S.regenBasePerSec;
   if (calm && coasting) regen += S.regenCalmBonusPerSec;
 
-  // cap depends on whether you’re overcharged
-  const cap = S.lightMaxOver;
-  S.light = clamp(S.light + regen * dt, 0, cap);
+  S.light = clamp(S.light + regen * dt, 0, S.lightMaxOver);
 
-  // Overcharge decay back toward 1 after a moment
+  // Overcharge decay
   if (S.light > 1.0001) {
     const decay = (performance.now() < S.overchargeUntilMs) ? 0.06 : 0.22; // per sec
     S.light = Math.max(1.0, S.light - decay * dt);
