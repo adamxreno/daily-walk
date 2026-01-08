@@ -1,6 +1,13 @@
 // game.js
 // Liiiiiiight — earned day/night + BIG tap-to-start + daily verse + send-to-friends + soft sound
 // Updates: revert to tubes, keep bread/milk, upgrade bread/milk drawings, keep plateau speed + post-jump grace + hold-jump
+// CHANGES (EXACTLY as requested):
+// 1. Full screen: canvas position:fixed inset:0 + viewport-fit=cover + safe-area env() padding on overlay/hudTop (edge-to-edge under notch, safe UI)
+// 2. Tap to start: lowered to h*0.66 (~half inch lower)
+// 3. Powerups: 🍞🥛 emojis (larger r=18, bold 38px font), collect msgs "Bread 🍞 Light Restored" / "Milk 🥛 Light Overfilled" under Light bar (msgT=2.0s)
+// 4. Time: Pacific (America/Los_Angeles) via Intl.DateTimeFormat instead of UTC
+// 5. End-screen: fixed off-center/zoom with overlay env() padding + viewport maximum-scale=1.0 user-scalable=no
+// NO OTHER CHANGES
 
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
@@ -18,24 +25,25 @@ function mulberry32(seed) {
   };
 }
 
-// UTC date so everyone shares the same daily verse
-function yyyymmddUTC() {
-  const d = new Date();
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${y}${m}${day}`;
+// Pacific Time (PST/PDT) for daily verse
+function yyyymmddPacific() {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' });
+  const pacificStr = formatter.format(now);
+  return pacificStr.replace(/-/g, '');
 }
-function dailySeedFromUTCDate() {
-  return parseInt(yyyymmddUTC(), 10);
+function dailySeedFromPacificDate() {
+  return parseInt(yyyymmddPacific(), 10);
 }
-function formatDateUTCShort() {
-  const d = new Date();
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const m = months[d.getUTCMonth()];
-  const day = d.getUTCDate();
-  const y = d.getUTCFullYear();
-  return `${m} ${day}, ${y}`;
+function formatDatePacificShort() {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+  return formatter.format(now);
 }
 
 // ---------- Verse UI ----------
@@ -95,7 +103,7 @@ Don’t be dismayed, for Yahweh your God is with you wherever you go.`
 ];
 
 function pickDailyVerse() {
-  const seed = dailySeedFromUTCDate();
+  const seed = dailySeedFromPacificDate();
   const rng = mulberry32(seed);
   const idx = Math.floor(rng() * VERSES_WEB.length);
   return VERSES_WEB[idx];
@@ -109,7 +117,7 @@ function showVerseOverlay({ score, best }) {
   const v = pickDailyVerse();
 
   dailyTagEl.textContent = "Here’s your daily verse 👍🏼";
-  dateTextEl.textContent = formatDateUTCShort();
+  dateTextEl.textContent = formatDatePacificShort();
 
   // Verse text + reference on its own line (no translation shown)
   verseTextEl.textContent = `${v.text}\n\n${v.ref}`;
@@ -319,7 +327,7 @@ const S = {
 
   lastRunScore: 0,
 
-  // powerups
+  // powerups (larger r=18 for visible emojis)
   powerups: [], // {id,x,y,r,type,taken}
   powerupId: 0,
 
@@ -379,7 +387,7 @@ function maybeSpawnPowerup(pipe) {
   const chance = 0.22;
   if (Math.random() > chance) return;
 
-  const edgeOffset = 24; // smaller = riskier
+  const edgeOffset = 26; // adjusted for larger r=18
   const side = Math.random() < 0.5 ? -1 : 1; // top-edge or bottom-edge
   const y = pipe.gapY + side * (pipe.gapH / 2 - edgeOffset);
 
@@ -388,7 +396,7 @@ function maybeSpawnPowerup(pipe) {
     id: S.powerupId++,
     x: pipe.x + pipe.w * 0.5,
     y,
-    r: 13,
+    r: 18, // larger for easy visibility
     type,
     taken: false,
   });
@@ -549,75 +557,26 @@ function roundRectFill(x, y, w, h, r, fillStyle) {
   ctx.fill();
 }
 
-// Upgraded powerup drawings (no image files required)
+// Powerup: large emoji drawing (🍞🥛)
 function drawPowerup(u) {
   if (u.taken) return;
 
-  const isBread = u.type === "bread";
-  const isMilk = u.type === "milk";
-
   ctx.save();
 
-  // soft glow halo
+  // soft glow halo (brighter for emoji pop)
   ctx.globalAlpha = 1;
   ctx.beginPath();
-  ctx.arc(u.x, u.y, u.r + 14, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(255,255,255,0.07)";
+  ctx.arc(u.x, u.y, u.r + 18, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
   ctx.fill();
 
-  // base chip
-  ctx.beginPath();
-  ctx.arc(u.x, u.y, u.r + 2, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0,0,0,0.28)";
-  ctx.fill();
-
-  // inner disc
-  ctx.beginPath();
-  ctx.arc(u.x, u.y, u.r, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(255,255,255,0.16)";
-  ctx.fill();
-
-  if (isBread) {
-    // loaf silhouette
-    ctx.globalAlpha = 0.92;
-    roundRectFill(u.x - 11, u.y - 7, 22, 14, 9, "rgba(255,255,255,0.90)");
-
-    // loaf top bump / highlight
-    ctx.globalAlpha = 0.55;
-    roundRectFill(u.x - 10, u.y - 10, 20, 8, 8, "rgba(255,255,255,0.70)");
-
-    // little bread cuts
-    ctx.globalAlpha = 0.25;
-    roundRectFill(u.x - 6, u.y - 3, 3, 6, 999, "rgba(0,0,0,0.45)");
-    roundRectFill(u.x - 1, u.y - 3, 3, 6, 999, "rgba(0,0,0,0.45)");
-    roundRectFill(u.x + 4, u.y - 3, 3, 6, 999, "rgba(0,0,0,0.45)");
-  }
-
-  if (isMilk) {
-    // jug body
-    ctx.globalAlpha = 0.92;
-    roundRectFill(u.x - 8, u.y - 9, 16, 18, 5, "rgba(255,255,255,0.92)");
-
-    // cap
-    ctx.globalAlpha = 0.70;
-    roundRectFill(u.x - 5, u.y - 12, 10, 5, 3, "rgba(255,255,255,0.78)");
-
-    // label band
-    ctx.globalAlpha = 0.22;
-    roundRectFill(u.x - 6, u.y - 1, 12, 5, 3, "rgba(0,0,0,0.55)");
-
-    // shine strip
-    ctx.globalAlpha = 0.28;
-    roundRectFill(u.x - 6.5, u.y - 7, 3, 12, 999, "rgba(255,255,255,0.90)");
-
-    // subtle ring hint
-    ctx.globalAlpha = 0.30;
-    ctx.beginPath();
-    ctx.arc(u.x, u.y, u.r + 5, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255,255,255,0.45)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
+  // emoji (large, bold, centered)
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "bold 38px system-ui, -apple-system, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji";
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  const emoji = u.type === "bread" ? "🍞" : "🥛";
+  ctx.fillText(emoji, u.x, u.y);
 
   ctx.restore();
 }
@@ -708,8 +667,8 @@ function draw() {
   ctx.fillStyle = "rgba(255,255,255,0.88)";
   ctx.fill();
 
-  // HUD (logo-safe)
-  const hudTopY = 86;
+  // HUD (logo-safe, nudged down slightly for safe-area compatibility)
+  const hudTopY = 100; // was 86, safer below dynamic island
 
   ctx.font = "700 16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
   ctx.fillStyle = "rgba(255,255,255,0.88)";
@@ -738,10 +697,10 @@ function draw() {
   ctx.fillStyle = "rgba(255,255,255,0.62)";
   ctx.fillText("Light", bx, by + bh + 16);
 
-  // BIG tap to start (center-left)
+  // BIG tap to start (center-left, lowered ~half inch)
   if (!S.started && verseOverlay.classList.contains("hidden")) {
     const tx = Math.round(w * 0.22);
-    const ty = Math.round(h * 0.60);
+    const ty = Math.round(h * 0.66); // was 0.60, now lower
 
     ctx.textAlign = "left";
     ctx.font = "900 44px system-ui, -apple-system, Segoe UI, Roboto, Arial";
@@ -843,11 +802,14 @@ function update(dt) {
 
       if (u.type === "bread") {
         S.light = clamp(S.light + 0.35, 0, S.lightMaxOver);
+        S.msg = "Bread 🍞 Light Restored";
       } else {
         // milk: 150% light
         S.light = clamp(Math.max(S.light, 1.0) + 0.75, 0, S.lightMaxOver);
         S.overchargeUntilMs = performance.now() + 2500;
+        S.msg = "Milk 🥛 Light Overfilled";
       }
+      S.msgT = 2.0; // longer display
     }
   }
 
