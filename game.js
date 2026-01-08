@@ -1,5 +1,5 @@
 // game.js
-// Liiiiiiight — earned day/night + BIG tap-to-start + daily verse + send-to-friends + soft sound + BIG emoji powerups
+// Liiiiiiight — earned day/night + BIG tap-to-start + daily verse + send-to-friends + soft sound
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
@@ -16,42 +16,38 @@ function mulberry32(seed) {
   };
 }
 
-// ---------- Safe-area helpers (for iPhone notch) ----------
-function cssPxVar(name) {
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const n = parseFloat(v || "0");
-  return Number.isFinite(n) ? n : 0;
-}
-function safeTop() { return cssPxVar("--sat"); }
-function safeBottom() { return cssPxVar("--sab"); }
-
-// ---------- Pacific Time daily date/seed ----------
-const PT_TZ = "America/Los_Angeles";
-
-function yyyymmddPT() {
-  // Use Intl to derive PT calendar date (stable, DST-safe)
+// ---------- Pacific Time (NOT UTC) for daily verse ----------
+function yyyymmddPacific() {
+  const d = new Date();
+  // Format in America/Los_Angeles then parse pieces
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: PT_TZ,
+    timeZone: "America/Los_Angeles",
     year: "numeric",
     month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(new Date());
+    day: "2-digit",
+  }).formatToParts(d);
 
   const y = parts.find(p => p.type === "year")?.value ?? "1970";
   const m = parts.find(p => p.type === "month")?.value ?? "01";
-  const d = parts.find(p => p.type === "day")?.value ?? "01";
-  return `${y}${m}${d}`;
+  const day = parts.find(p => p.type === "day")?.value ?? "01";
+  return `${y}${m}${day}`;
 }
-function dailySeedFromPTDate() {
-  return parseInt(yyyymmddPT(), 10);
+function dailySeedFromPacificDate() {
+  return parseInt(yyyymmddPacific(), 10);
 }
-function formatDatePTShort() {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: PT_TZ,
+function formatDatePacificShort() {
+  const d = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
     month: "short",
     day: "numeric",
-    year: "numeric"
-  }).format(new Date());
+  }).formatToParts(d);
+
+  const m = parts.find(p => p.type === "month")?.value ?? "Jan";
+  const day = parts.find(p => p.type === "day")?.value ?? "1";
+  const y = parts.find(p => p.type === "year")?.value ?? "1970";
+  return `${m} ${day}, ${y}`;
 }
 
 // ---------- Verse UI ----------
@@ -66,7 +62,7 @@ const sendBtn = document.getElementById("sendBtn");
 const shareStatus = document.getElementById("shareStatus");
 const resultText = document.getElementById("resultText");
 
-// WEB wording
+// WEB (public domain) wording
 const VERSES_WEB = [
   {
     ref: "Philippians 4:6–7",
@@ -111,7 +107,7 @@ Don’t be dismayed, for Yahweh your God is with you wherever you go.`
 ];
 
 function pickDailyVerse() {
-  const seed = dailySeedFromPTDate();
+  const seed = dailySeedFromPacificDate();
   const rng = mulberry32(seed);
   const idx = Math.floor(rng() * VERSES_WEB.length);
   return VERSES_WEB[idx];
@@ -125,14 +121,16 @@ function showVerseOverlay({ score, best }) {
   const v = pickDailyVerse();
 
   dailyTagEl.textContent = "Here’s your daily verse 👍🏼";
-  dateTextEl.textContent = formatDatePTShort();
+  dateTextEl.textContent = formatDatePacificShort();
 
+  // Verse text + reference on its own line (no translation shown)
   verseTextEl.textContent = `${v.text}\n\n${v.ref}`;
 
   cardTitleEl.textContent = "It’s okay, try again.";
   resultText.textContent = `Score: ${score} • Best: ${best}`;
   shareStatus.textContent = "";
 
+  // Lock Continue for 5 seconds, then swap countdown -> Continue in same spot
   continueBtn.disabled = true;
   continueBtn.classList.add("hiddenBtn");
   unlockHint.textContent = "Please wait 5s…";
@@ -188,7 +186,9 @@ async function sendToFriends() {
       await navigator.share({ text, url: GAME_URL, title: "Liiiiiiight" });
       shareStatus.textContent = "";
       return;
-    } catch {}
+    } catch {
+      // user cancelled or blocked
+    }
   }
 
   const smsUrl = `sms:&body=${encodeURIComponent(text)}`;
@@ -206,16 +206,22 @@ async function sendToFriends() {
 }
 sendBtn.addEventListener("click", sendToFriends);
 
-// ---------- Sound ----------
-const audio = { ctx: null, master: null, ready: false };
+// ---------- Sound (no mute button) ----------
+const audio = {
+  ctx: null,
+  master: null,
+  ready: false,
+};
 
 function ensureAudio() {
   if (audio.ready) return;
+
   const Ctx = window.AudioContext || window.webkitAudioContext;
   if (!Ctx) return;
+
   audio.ctx = new Ctx();
   audio.master = audio.ctx.createGain();
-  audio.master.gain.value = 0.22;
+  audio.master.gain.value = 0.22; // subtle
   audio.master.connect(audio.ctx.destination);
   audio.ready = true;
 }
@@ -246,9 +252,16 @@ function sfxFlap() {
   playTone({ type:"triangle", freq: 880, dur: 0.032, gain: 0.06, release: 0.02 });
   playTone({ type:"triangle", freq: 1320, dur: 0.028, gain: 0.05, release: 0.02 });
 }
-function sfxHit() { playTone({ type:"sine", freq: 150, dur: 0.045, gain: 0.08, release: 0.04 }); }
-function sfxScore() { playTone({ type:"sine", freq: 660, dur: 0.03, gain: 0.045, release: 0.02 }); }
-function sfxPower() { playTone({ type:"sine", freq: 980, dur: 0.04, gain: 0.06, release: 0.03 }); }
+function sfxHit() {
+  playTone({ type:"sine", freq: 150, dur: 0.045, gain: 0.08, release: 0.04 });
+}
+function sfxScore() {
+  playTone({ type:"sine", freq: 660, dur: 0.03, gain: 0.045, release: 0.02 });
+}
+function sfxPower() {
+  playTone({ type:"sine", freq: 880, dur: 0.03, gain: 0.05, release: 0.02 });
+  playTone({ type:"sine", freq: 1240, dur: 0.03, gain: 0.045, release: 0.02 });
+}
 
 // ---------- Canvas sizing ----------
 function resizeCanvas() {
@@ -262,8 +275,8 @@ resizeCanvas();
 
 // ---------- Game State ----------
 const S = {
-  started: false,
-  running: false,
+  started: false,   // tap-to-start gate
+  running: false,   // physics only when true
 
   x: 0, y: 0, vy: 0, r: 12,
 
@@ -274,13 +287,20 @@ const S = {
   baseScroll: 240,
   scroll: 240,
 
+  // speed plateau (IMPORTANT: no endless ramp)
+  scrollPerScore: 3.2,        // gentle increase
+  maxScroll: 320,             // hard cap (keeps late game forgiving)
+
+  // earned day/night (toggle every 40 points)
   dayAmount: 0,
   dayTarget: 0,
   dayEvery: 40,
 
-  // Light can overfill to 150% with milk
+  // Light system: normal max 1.0, milk can overcharge to 1.5 temporarily
   light: 1,
-  lightMax: 1.5,
+  lightMaxNormal: 1.0,
+  lightMaxOver: 1.5,
+  overDrainPerSec: 0.16,      // drains 150% -> 100% gradually
 
   drainOnHit: 0.28,
   regenBasePerSec: 0.10,
@@ -299,17 +319,25 @@ const S = {
   spacingMin: 330,
   spawnLead: 1100,
 
+  // Powerups
+  items: [], // {id, type:"bread"|"milk", x, y, r, alive}
+  itemId: 0,
+  itemSpawnChance: 0.38,      // overall chance per pipe set
+  milkChance: 0.28,           // of spawned items, chance it is milk (rarer)
+  itemR: 18,                  // collision radius
+  itemFontPx: 38,             // BIG emoji
+
   score: 0,
   best: 0,
   passed: new Set(),
 
-  // Powerups
-  powerups: [], // { id, x, y, kind:'bread'|'milk', r, alive }
-  powerId: 0,
-
   msg: "Tap to start.",
   msgT: 999,
   lastHitT: -999,
+
+  // HUD note under light
+  hudNote: "",
+  hudNoteT: 0,
 
   lastRunScore: 0,
 };
@@ -318,7 +346,9 @@ function loadBest() {
   const v = parseInt(localStorage.getItem("dailywalk_best_v1") || "0", 10);
   S.best = Number.isFinite(v) ? v : 0;
 }
-function saveBest() { localStorage.setItem("dailywalk_best_v1", String(S.best)); }
+function saveBest() {
+  localStorage.setItem("dailywalk_best_v1", String(S.best));
+}
 
 function resetRun() {
   S.x = Math.round(window.innerWidth * 0.28);
@@ -329,7 +359,7 @@ function resetRun() {
   S.scroll = S.baseScroll;
 
   S.pipes = [];
-  S.powerups = [];
+  S.items = [];
   S.passed.clear();
   S.score = 0;
   S.lastGapY = null;
@@ -338,6 +368,9 @@ function resetRun() {
   S.msgT = 0;
   S.lastHitT = -999;
   S.lastFlapT = -999;
+
+  S.hudNote = "";
+  S.hudNoteT = 0;
 
   const w = window.innerWidth;
   const startX = w + 520;
@@ -354,30 +387,30 @@ function smoothGapY(targetGapY) {
   return clamp(targetGapY, S.lastGapY - maxDelta, S.lastGapY + maxDelta);
 }
 
-function maybeSpawnPowerupForPipe(p) {
-  // Not too frequent, but regular enough to feel like a “thing”
-  // Increase chance slightly after score 10
-  const baseChance = 0.18;
-  const chance = baseChance + clamp(S.score / 120, 0, 0.12); // up to +0.12
+function maybeSpawnItemNearPipe(pipe) {
+  // only spawn once per pipe id
+  if (Math.random() > S.itemSpawnChance) return;
 
-  if (Math.random() > chance) return;
+  const isMilk = Math.random() < S.milkChance;
+  const type = isMilk ? "milk" : "bread";
 
-  const kind = Math.random() < 0.62 ? "bread" : "milk"; // bread more common
+  // Put them in “slightly dangerous” spots near the gap edges
+  // (top edge or bottom edge of the gap, with small offset)
+  const edge = Math.random() < 0.5 ? "top" : "bottom";
+  const offset = 24 + Math.random() * 26; // pushes toward danger
+  const y = edge === "top"
+    ? (pipe.gapY - pipe.gapH / 2) + offset
+    : (pipe.gapY + pipe.gapH / 2) - offset;
 
-  // Place inside the gap, but in slightly “dangerous” spots (near edges)
-  const edgeBias = Math.random() < 0.55; // often near an edge
-  const offset = edgeBias
-    ? (Math.random() < 0.5 ? -1 : 1) * (p.gapH * (0.28 + Math.random() * 0.10))
-    : (Math.random() - 0.5) * (p.gapH * 0.30);
+  // center-ish inside the pipe column (so you have to commit)
+  const x = pipe.x + pipe.w * (0.45 + Math.random() * 0.25);
 
-  const y = p.gapY + offset;
-
-  S.powerups.push({
-    id: S.powerId++,
-    x: p.x + p.w + 46,     // just after the pipe face
+  S.items.push({
+    id: S.itemId++,
+    type,
+    x,
     y,
-    kind,
-    r: 18,                 // collision radius
+    r: S.itemR,
     alive: true,
   });
 }
@@ -400,8 +433,8 @@ function spawnPipe(x) {
   const pipe = { id: S.pipeId++, x, w: S.pipeW, gapY, gapH: gap };
   S.pipes.push(pipe);
 
-  // Power-up occasionally tied to a pipe spawn
-  maybeSpawnPowerupForPipe(pipe);
+  // Powerups tied to the pipes
+  maybeSpawnItemNearPipe(pipe);
 }
 
 function circleRectCollide(cx, cy, r, rx, ry, rw, rh) {
@@ -412,9 +445,33 @@ function circleRectCollide(cx, cy, r, rx, ry, rw, rh) {
   return dx * dx + dy * dy <= r * r;
 }
 
-function circleCircleHit(ax, ay, ar, bx, by, br) {
-  const dx = ax - bx, dy = ay - by;
-  return (dx*dx + dy*dy) <= (ar + br) * (ar + br);
+function circleCircleCollide(ax, ay, ar, bx, by, br) {
+  const dx = ax - bx;
+  const dy = ay - by;
+  const rr = ar + br;
+  return dx * dx + dy * dy <= rr * rr;
+}
+
+function setHudNote(text, seconds = 1.25) {
+  S.hudNote = text;
+  S.hudNoteT = seconds;
+}
+
+function collectItem(item) {
+  if (!item.alive) return;
+  item.alive = false;
+
+  if (item.type === "bread") {
+    // Bread: full restore to 100%
+    S.light = S.lightMaxNormal;
+    setHudNote("Bread 🍞 Light Restored");
+  } else {
+    // Milk: overcharge to 150%, then it drains back to 100%
+    S.light = S.lightMaxOver;
+    setHudNote("Milk 🥛 Light Overfilled");
+  }
+
+  sfxPower();
 }
 
 function hit() {
@@ -422,7 +479,8 @@ function hit() {
   if (t - S.lastHitT < 0.2) return;
   S.lastHitT = t;
 
-  S.light = clamp(S.light - S.drainOnHit, 0, S.lightMax);
+  // If you're overcharged, you're still not invincible — but it helps.
+  S.light = clamp(S.light - S.drainOnHit, 0, S.lightMaxOver);
   S.vy *= 0.72;
 
   S.msg = "You slipped. Try again steady.";
@@ -437,7 +495,10 @@ function endRun() {
   S.running = false;
   S.lastRunScore = S.score;
 
-  if (S.score > S.best) { S.best = S.score; saveBest(); }
+  if (S.score > S.best) {
+    S.best = S.score;
+    saveBest();
+  }
 
   showVerseOverlay({ score: S.score, best: S.best });
 }
@@ -457,7 +518,7 @@ function startGameAndFlap() {
   const t = performance.now() / 1000;
   S.lastFlapT = t;
 
-  const strength = 0.88 + 0.28 * (S.light / S.lightMax);
+  const strength = 0.88 + 0.28 * Math.min(S.light, 1.0);
   S.vy = S.thrust * strength;
 
   sfxFlap();
@@ -490,8 +551,9 @@ function roundRectFill(x, y, w, h, r, fillStyle) {
   ctx.fill();
 }
 
+// Earned day/night: toggle every 40 points, smooth transition
 function updateDayNight() {
-  const phase = Math.floor(S.score / S.dayEvery) % 2;
+  const phase = Math.floor(S.score / S.dayEvery) % 2; // 0=night, 1=day
   S.dayTarget = phase === 1 ? 1 : 0;
   S.dayAmount = lerp(S.dayAmount, S.dayTarget, 0.02);
 }
@@ -542,34 +604,13 @@ function drawBackground(w, h) {
   ctx.globalAlpha = 1;
 }
 
-function drawPowerups() {
-  // BIG emojis (super readable)
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = "900 44px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-
-  for (const pu of S.powerups) {
-    if (!pu.alive) continue;
-
-    // subtle glow behind emoji
-    ctx.beginPath();
-    ctx.arc(pu.x, pu.y, 26, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
-    ctx.fill();
-
-    const emoji = pu.kind === "milk" ? "🥛" : "🍞";
-    ctx.fillStyle = "rgba(255,255,255,0.95)";
-    ctx.fillText(emoji, pu.x, pu.y);
-  }
-}
-
 function draw() {
   const w = window.innerWidth;
   const h = window.innerHeight;
 
   drawBackground(w, h);
 
-  // pipes
+  // tubes (no visible outlines)
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
@@ -577,25 +618,41 @@ function draw() {
     roundRectFill(p.x, gapBot, p.w, h - gapBot, 12, "rgba(0,0,0,0.72)");
   }
 
-  drawPowerups();
+  // powerups (BIG emoji)
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `900 ${S.itemFontPx}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+  for (const it of S.items) {
+    if (!it.alive) continue;
+    // subtle glow so they pop
+    ctx.globalAlpha = 0.18;
+    ctx.beginPath();
+    ctx.arc(it.x, it.y, it.r + 16, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.fill();
+    ctx.globalAlpha = 1;
 
-  // player glow scales with (light / lightMax)
-  const lNorm = clamp(S.light / S.lightMax, 0, 1);
-  const glow = 16 + 30 * lNorm;
-  const alpha = 0.20 + 0.55 * lNorm;
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.fillText(it.type === "bread" ? "🍞" : "🥛", it.x, it.y);
+  }
+
+  // player glow
+  const glow = 16 + 30 * Math.min(S.light, 1.0);
+  const alpha = 0.20 + 0.55 * Math.min(S.light, 1.0);
 
   ctx.beginPath();
   ctx.arc(S.x, S.y, glow, 0, Math.PI * 2);
   ctx.fillStyle = `rgba(255,255,255,${alpha * 0.12})`;
   ctx.fill();
 
+  // player
   ctx.beginPath();
   ctx.arc(S.x, S.y, S.r, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(255,255,255,0.88)";
   ctx.fill();
 
-  // HUD respects safe area
-  const hudTopY = safeTop() + 86;
+  // HUD (logo-safe)
+  const hudTopY = 86;
 
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
@@ -608,19 +665,35 @@ function draw() {
   ctx.fillStyle = "rgba(255,255,255,0.62)";
   ctx.fillText(`Best: ${S.best}`, 14, hudTopY + 18);
 
-  // light bar
+  // light bar (shows overcharge!)
   const bx = 14, by = hudTopY + 30, bw = 160, bh = 10;
-  roundRectFill(bx, by, bw, bh, 999, "rgba(255,255,255,0.12)");
-  const fill = bw * clamp(S.light / S.lightMax, 0, 1);
-  roundRectFill(bx, by, fill, bh, 999, `rgba(255,255,255,${0.22 + 0.65 * lNorm})`);
+  const lightPct = clamp(S.light / S.lightMaxOver, 0, 1);
 
+  roundRectFill(bx, by, bw, bh, 999, "rgba(255,255,255,0.12)");
+  roundRectFill(
+    bx,
+    by,
+    bw * lightPct,
+    bh,
+    999,
+    `rgba(255,255,255,${0.22 + 0.65 * Math.min(S.light, 1.0)})`
+  );
+
+  // Light label UNDER the bar
   ctx.fillStyle = "rgba(255,255,255,0.62)";
   ctx.fillText("Light", bx, by + bh + 16);
 
-  // Tap to start: moved LOWER (~½ inch)
+  // Powerup note under Light label
+  if (S.hudNoteT > 0 && S.hudNote) {
+    ctx.font = "700 12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillStyle = "rgba(255,255,255,0.80)";
+    ctx.fillText(S.hudNote, bx, by + bh + 34);
+  }
+
+  // BIG tap to start (lowered slightly)
   if (!S.started && verseOverlay.classList.contains("hidden")) {
     const tx = Math.round(w * 0.22);
-    const ty = Math.round(h * 0.66); // was ~0.60
+    const ty = Math.round(h * 0.60) + 22; // ~half inch-ish lower
 
     ctx.textAlign = "left";
     ctx.font = "900 44px system-ui, -apple-system, Segoe UI, Roboto, Arial";
@@ -636,7 +709,7 @@ function draw() {
     ctx.textAlign = "left";
     ctx.font = "700 13px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     ctx.fillStyle = "rgba(255,255,255,0.74)";
-    ctx.fillText(S.msg, 14, by + bh + 46);
+    ctx.fillText(S.msg, 14, by + bh + 62);
   }
 }
 
@@ -667,18 +740,19 @@ let last = performance.now();
 function update(dt) {
   const h = window.innerHeight;
 
-  const target = S.baseScroll + S.score * 4.2;
-  S.scroll = target * (0.82 + 0.18 * clamp(S.light / S.lightMax, 0, 1));
+  // speed plateau (no endless ramp)
+  const target = Math.min(S.baseScroll + S.score * S.scrollPerScore, S.maxScroll);
+  S.scroll = target * (0.82 + 0.18 * Math.min(S.light, 1.0));
 
   updateDayNight();
 
   for (const p of S.pipes) p.x -= S.scroll * dt;
-  S.pipes = S.pipes.filter(p => p.x + p.w > -140);
-  ensurePipesAhead();
+  for (const it of S.items) it.x -= S.scroll * dt;
 
-  // move powerups with world
-  for (const pu of S.powerups) pu.x -= S.scroll * dt;
-  S.powerups = S.powerups.filter(pu => pu.x > -120 && pu.alive);
+  S.pipes = S.pipes.filter(p => p.x + p.w > -140);
+  S.items = S.items.filter(it => it.x > -200 && it.alive);
+
+  ensurePipesAhead();
 
   S.vy += S.gravity * dt;
   S.vy = clamp(S.vy, -1200, S.maxFall);
@@ -687,7 +761,7 @@ function update(dt) {
   if (S.y < S.r) { S.y = S.r; S.vy *= -0.25; hit(); }
   if (S.y > h - S.r) { S.y = h - S.r; hit(); }
 
-  // pipe collisions + score
+  // collisions: tubes + scoring
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
@@ -703,28 +777,15 @@ function update(dt) {
     }
   }
 
-  // powerup pickup
-  for (const pu of S.powerups) {
-    if (!pu.alive) continue;
-    if (circleCircleHit(S.x, S.y, S.r, pu.x, pu.y, pu.r)) {
-      pu.alive = false;
-
-      if (pu.kind === "bread") {
-        // instant “refill to 100%”
-        S.light = Math.max(S.light, 1.0);
-        S.msg = "🍞  Steady. Light restored.";
-        S.msgT = 0.9;
-      } else {
-        // “150% light”
-        S.light = S.lightMax;
-        S.msg = "🥛  OVERFILLED. Keep going.";
-        S.msgT = 0.9;
-      }
-      sfxPower();
+  // collisions: items
+  for (const it of S.items) {
+    if (!it.alive) continue;
+    if (circleCircleCollide(S.x, S.y, S.r, it.x, it.y, it.r)) {
+      collectItem(it);
     }
   }
 
-  // regen logic
+  // regen + overcharge drain rules
   const t = performance.now() / 1000;
   const calm = Math.abs(S.vy) < 260;
   const coasting = (t - S.lastFlapT) >= S.regenCoastGateSec;
@@ -732,10 +793,19 @@ function update(dt) {
   let regen = S.regenBasePerSec;
   if (calm && coasting) regen += S.regenCalmBonusPerSec;
 
-  S.light = clamp(S.light + regen * dt, 0, S.lightMax);
+  // Only regen up to 100% naturally
+  if (S.light <= S.lightMaxNormal) {
+    S.light = clamp(S.light + regen * dt, 0, S.lightMaxNormal);
+  } else {
+    // If overcharged, drain back down toward 100% (grace period feel)
+    S.light = clamp(S.light - S.overDrainPerSec * dt, S.lightMaxNormal, S.lightMaxOver);
+  }
 
   if (S.msgT > 0) S.msgT -= dt;
   if (S.msgT <= 0 && S.running) S.msg = "";
+
+  if (S.hudNoteT > 0) S.hudNoteT -= dt;
+  if (S.hudNoteT <= 0) S.hudNote = "";
 
   if (S.light <= 0.0001) endRun();
 }
@@ -754,13 +824,21 @@ function loop() {
 
 // boot
 (function init() {
-  resizeCanvas();
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  canvas.width = Math.floor(window.innerWidth * dpr);
+  canvas.height = Math.floor(window.innerHeight * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 })();
-window.addEventListener("resize", resizeCanvas);
+window.addEventListener("resize", () => {
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  canvas.width = Math.floor(window.innerWidth * dpr);
+  canvas.height = Math.floor(window.innerHeight * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+});
 
 loadBest();
 
-// Tap-to-start: stable starting position (no falling)
+// Tap-to-start state: set a stable starting position (no falling)
 S.x = Math.round(window.innerWidth * 0.28);
 S.y = Math.round(window.innerHeight * 0.45);
 S.vy = 0;
