@@ -169,7 +169,7 @@ continueBtn.addEventListener("click", () => {
 });
 
 // ---------- “Send to your friends!” ----------
-const GAME_URL = "https://adamxreno.github.io/daily-walk/";
+const GAME_URL = "http://www.liiiiiiight.com/";
 function buildInviteMessage() {
   return `I love this new game (Liiiiiiight) and think you will too!! 👀 ${GAME_URL}`;
 }
@@ -707,9 +707,11 @@ function draw() {
     ctx.fillStyle = "rgba(255,255,255,0.92)";
     ctx.fillText("Tap to start", tx, ty);
 
-    ctx.font = "800 16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillStyle = "rgba(255,255,255,0.62)";
-    ctx.fillText("Spacebar works too 🫣", tx, ty + 28);
+  // Smaller hint — perfectly centered on screen
+  ctx.textAlign = "center";
+  ctx.font = "800 16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+  ctx.fillStyle = "rgba(255,255,255,0.62)";
+  ctx.fillText("Spacebar works too 🫣", w / 2, ty + 28);
   }
 
   if (S.msg && S.msgT > 0 && S.started && verseOverlay.classList.contains("hidden")) {
