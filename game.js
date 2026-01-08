@@ -700,7 +700,7 @@ function draw() {
   // BIG tap to start (center-left, lowered ~half inch)
   if (!S.started && verseOverlay.classList.contains("hidden")) {
     const tx = Math.round(w * 0.22);
-    const ty = Math.round(h * 0.70); // was 0.60, now lower
+    const ty = Math.round(h * 0.72); // was 0.60, now lower
 
     ctx.textAlign = "left";
     ctx.font = "900 44px system-ui, -apple-system, Segoe UI, Roboto, Arial";
