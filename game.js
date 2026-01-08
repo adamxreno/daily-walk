@@ -1,5 +1,7 @@
 // game.js
 // Liiiiiiight — earned day/night + BIG tap-to-start + daily verse + send-to-friends + soft sound
+// Updates: revert to tubes, keep bread/milk, upgrade bread/milk drawings, keep plateau speed + post-jump grace + hold-jump
+
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
@@ -16,37 +18,23 @@ function mulberry32(seed) {
   };
 }
 
-// ---------- Pacific Time (NOT UTC) for daily verse ----------
-function yyyymmddPacific() {
+// UTC date so everyone shares the same daily verse
+function yyyymmddUTC() {
   const d = new Date();
-  // Format in America/Los_Angeles then parse pieces
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(d);
-
-  const y = parts.find(p => p.type === "year")?.value ?? "1970";
-  const m = parts.find(p => p.type === "month")?.value ?? "01";
-  const day = parts.find(p => p.type === "day")?.value ?? "01";
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
   return `${y}${m}${day}`;
 }
-function dailySeedFromPacificDate() {
-  return parseInt(yyyymmddPacific(), 10);
+function dailySeedFromUTCDate() {
+  return parseInt(yyyymmddUTC(), 10);
 }
-function formatDatePacificShort() {
+function formatDateUTCShort() {
   const d = new Date();
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).formatToParts(d);
-
-  const m = parts.find(p => p.type === "month")?.value ?? "Jan";
-  const day = parts.find(p => p.type === "day")?.value ?? "1";
-  const y = parts.find(p => p.type === "year")?.value ?? "1970";
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const m = months[d.getUTCMonth()];
+  const day = d.getUTCDate();
+  const y = d.getUTCFullYear();
   return `${m} ${day}, ${y}`;
 }
 
@@ -107,7 +95,7 @@ Don’t be dismayed, for Yahweh your God is with you wherever you go.`
 ];
 
 function pickDailyVerse() {
-  const seed = dailySeedFromPacificDate();
+  const seed = dailySeedFromUTCDate();
   const rng = mulberry32(seed);
   const idx = Math.floor(rng() * VERSES_WEB.length);
   return VERSES_WEB[idx];
@@ -121,7 +109,7 @@ function showVerseOverlay({ score, best }) {
   const v = pickDailyVerse();
 
   dailyTagEl.textContent = "Here’s your daily verse 👍🏼";
-  dateTextEl.textContent = formatDatePacificShort();
+  dateTextEl.textContent = formatDateUTCShort();
 
   // Verse text + reference on its own line (no translation shown)
   verseTextEl.textContent = `${v.text}\n\n${v.ref}`;
@@ -173,7 +161,7 @@ continueBtn.addEventListener("click", () => {
 });
 
 // ---------- “Send to your friends!” ----------
-const GAME_URL = "https://liiiiiight.com/";
+const GAME_URL = "https://adamxreno.github.io/daily-walk/";
 function buildInviteMessage() {
   return `I love this new game (Liiiiiiight) and think you will too!! 👀 ${GAME_URL}`;
 }
@@ -258,9 +246,9 @@ function sfxHit() {
 function sfxScore() {
   playTone({ type:"sine", freq: 660, dur: 0.03, gain: 0.045, release: 0.02 });
 }
-function sfxPower() {
-  playTone({ type:"sine", freq: 880, dur: 0.03, gain: 0.05, release: 0.02 });
-  playTone({ type:"sine", freq: 1240, dur: 0.03, gain: 0.045, release: 0.02 });
+function sfxPowerup() {
+  playTone({ type:"sine", freq: 900, dur: 0.03, gain: 0.05, release: 0.02 });
+  playTone({ type:"sine", freq: 1200, dur: 0.03, gain: 0.04, release: 0.02 });
 }
 
 // ---------- Canvas sizing ----------
@@ -284,29 +272,31 @@ const S = {
   thrust: -420,
   maxFall: 900,
 
-  baseScroll: 240,
-  scroll: 240,
+  // post-jump “float forgiveness”
+  postJumpGraceMs: 150,
+  postJumpGravityScale: 0.72,
+  postJumpUntilMs: 0,
 
-  // speed plateau (IMPORTANT: no endless ramp)
-  scrollPerScore: 3.2,        // gentle increase
-  maxScroll: 320,             // hard cap (keeps late game forgiving)
+  // speed plateau
+  baseScroll: 240,
+  maxScroll: 310,
+  scrollRampPerScore: 2.8,
+  scroll: 240,
 
   // earned day/night (toggle every 40 points)
   dayAmount: 0,
   dayTarget: 0,
   dayEvery: 40,
 
-  // Light system: normal max 1.0, milk can overcharge to 1.5 temporarily
   light: 1,
-  lightMaxNormal: 1.0,
+  lightMax: 1.0,
   lightMaxOver: 1.5,
-  overDrainPerSec: 0.16,      // drains 150% -> 100% gradually
-
   drainOnHit: 0.28,
   regenBasePerSec: 0.10,
   regenCalmBonusPerSec: 0.08,
   regenCoastGateSec: 0.35,
   lastFlapT: -999,
+  overchargeUntilMs: 0,
 
   pipes: [],
   pipeW: 78,
@@ -319,14 +309,6 @@ const S = {
   spacingMin: 330,
   spawnLead: 1100,
 
-  // Powerups
-  items: [], // {id, type:"bread"|"milk", x, y, r, alive}
-  itemId: 0,
-  itemSpawnChance: 0.38,      // overall chance per pipe set
-  milkChance: 0.28,           // of spawned items, chance it is milk (rarer)
-  itemR: 18,                  // collision radius
-  itemFontPx: 38,             // BIG emoji
-
   score: 0,
   best: 0,
   passed: new Set(),
@@ -335,11 +317,18 @@ const S = {
   msgT: 999,
   lastHitT: -999,
 
-  // HUD note under light
-  hudNote: "",
-  hudNoteT: 0,
-
   lastRunScore: 0,
+
+  // powerups
+  powerups: [], // {id,x,y,r,type,taken}
+  powerupId: 0,
+
+  // press/hold jump
+  holdActive: false,
+  holdStartMs: 0,
+  maxHoldMs: 140,
+  minJumpScale: 0.92,
+  maxJumpScale: 1.16,
 };
 
 function loadBest() {
@@ -357,9 +346,10 @@ function resetRun() {
 
   S.light = 1;
   S.scroll = S.baseScroll;
+  S.overchargeUntilMs = 0;
 
   S.pipes = [];
-  S.items = [];
+  S.powerups = [];
   S.passed.clear();
   S.score = 0;
   S.lastGapY = null;
@@ -368,9 +358,6 @@ function resetRun() {
   S.msgT = 0;
   S.lastHitT = -999;
   S.lastFlapT = -999;
-
-  S.hudNote = "";
-  S.hudNoteT = 0;
 
   const w = window.innerWidth;
   const startX = w + 520;
@@ -387,31 +374,23 @@ function smoothGapY(targetGapY) {
   return clamp(targetGapY, S.lastGapY - maxDelta, S.lastGapY + maxDelta);
 }
 
-function maybeSpawnItemNearPipe(pipe) {
-  // only spawn once per pipe id
-  if (Math.random() > S.itemSpawnChance) return;
+function maybeSpawnPowerup(pipe) {
+  // powerups spawn in slightly dangerous positions near gap edges
+  const chance = 0.22;
+  if (Math.random() > chance) return;
 
-  const isMilk = Math.random() < S.milkChance;
-  const type = isMilk ? "milk" : "bread";
+  const edgeOffset = 24; // smaller = riskier
+  const side = Math.random() < 0.5 ? -1 : 1; // top-edge or bottom-edge
+  const y = pipe.gapY + side * (pipe.gapH / 2 - edgeOffset);
 
-  // Put them in “slightly dangerous” spots near the gap edges
-  // (top edge or bottom edge of the gap, with small offset)
-  const edge = Math.random() < 0.5 ? "top" : "bottom";
-  const offset = 24 + Math.random() * 26; // pushes toward danger
-  const y = edge === "top"
-    ? (pipe.gapY - pipe.gapH / 2) + offset
-    : (pipe.gapY + pipe.gapH / 2) - offset;
-
-  // center-ish inside the pipe column (so you have to commit)
-  const x = pipe.x + pipe.w * (0.45 + Math.random() * 0.25);
-
-  S.items.push({
-    id: S.itemId++,
-    type,
-    x,
+  const type = Math.random() < 0.72 ? "bread" : "milk"; // milk rarer
+  S.powerups.push({
+    id: S.powerupId++,
+    x: pipe.x + pipe.w * 0.5,
     y,
-    r: S.itemR,
-    alive: true,
+    r: 13,
+    type,
+    taken: false,
   });
 }
 
@@ -433,8 +412,7 @@ function spawnPipe(x) {
   const pipe = { id: S.pipeId++, x, w: S.pipeW, gapY, gapH: gap };
   S.pipes.push(pipe);
 
-  // Powerups tied to the pipes
-  maybeSpawnItemNearPipe(pipe);
+  maybeSpawnPowerup(pipe);
 }
 
 function circleRectCollide(cx, cy, r, rx, ry, rw, rh) {
@@ -445,41 +423,11 @@ function circleRectCollide(cx, cy, r, rx, ry, rw, rh) {
   return dx * dx + dy * dy <= r * r;
 }
 
-function circleCircleCollide(ax, ay, ar, bx, by, br) {
-  const dx = ax - bx;
-  const dy = ay - by;
-  const rr = ar + br;
-  return dx * dx + dy * dy <= rr * rr;
-}
-
-function setHudNote(text, seconds = 1.25) {
-  S.hudNote = text;
-  S.hudNoteT = seconds;
-}
-
-function collectItem(item) {
-  if (!item.alive) return;
-  item.alive = false;
-
-  if (item.type === "bread") {
-    // Bread: full restore to 100%
-    S.light = S.lightMaxNormal;
-    setHudNote("Bread 🍞 Light Restored");
-  } else {
-    // Milk: overcharge to 150%, then it drains back to 100%
-    S.light = S.lightMaxOver;
-    setHudNote("Milk 🥛 Light Overfilled");
-  }
-
-  sfxPower();
-}
-
 function hit() {
   const t = performance.now() / 1000;
   if (t - S.lastHitT < 0.2) return;
   S.lastHitT = t;
 
-  // If you're overcharged, you're still not invincible — but it helps.
   S.light = clamp(S.light - S.drainOnHit, 0, S.lightMaxOver);
   S.vy *= 0.72;
 
@@ -503,36 +451,86 @@ function endRun() {
   showVerseOverlay({ score: S.score, best: S.best });
 }
 
-function startGameAndFlap() {
+// unified jump function with post-jump grace
+function doJump(strengthScale = 1) {
+  const t = performance.now() / 1000;
+  S.lastFlapT = t;
+
+  const strength = (0.88 + 0.28 * clamp(S.light, 0, 1)) * strengthScale;
+  S.vy = S.thrust * strength;
+
+  // Post-jump gravity grace window
+  S.postJumpUntilMs = performance.now() + S.postJumpGraceMs;
+
+  sfxFlap();
+}
+
+// Tap-to-start should start instantly, then your first jump happens immediately.
+function startGameAndInitialJump() {
   if (!S.started) {
     S.started = true;
     S.running = true;
     resetRun();
     S.vy = S.thrust * 0.72;
+    S.postJumpUntilMs = performance.now() + S.postJumpGraceMs;
     sfxFlap();
     return;
   }
-
-  if (!S.running) return;
-
-  const t = performance.now() / 1000;
-  S.lastFlapT = t;
-
-  const strength = 0.88 + 0.28 * Math.min(S.light, 1.0);
-  S.vy = S.thrust * strength;
-
-  sfxFlap();
 }
 
-window.addEventListener("pointerdown", () => {
+function beginHold() {
   if (!verseOverlay.classList.contains("hidden")) return;
-  startGameAndFlap();
-});
+
+  if (!S.started) {
+    startGameAndInitialJump();
+    return;
+  }
+  if (!S.running) return;
+
+  S.holdActive = true;
+  S.holdStartMs = performance.now();
+}
+
+function endHoldAndJump() {
+  if (!verseOverlay.classList.contains("hidden")) return;
+  if (!S.started || !S.running) return;
+  if (!S.holdActive) return;
+
+  S.holdActive = false;
+
+  const held = performance.now() - S.holdStartMs;
+  const clamped = clamp(held, 0, S.maxHoldMs);
+  const t = clamped / S.maxHoldMs;
+
+  // smoothstep easing
+  const eased = t * t * (3 - 2 * t);
+  const scale = S.minJumpScale + (S.maxJumpScale - S.minJumpScale) * eased;
+
+  doJump(scale);
+}
+
+// Pointer controls (hold duration affects jump)
+window.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  beginHold();
+}, { passive: false });
+
+window.addEventListener("pointerup", (e) => {
+  e.preventDefault();
+  endHoldAndJump();
+}, { passive: false });
+
+// Spacebar controls (keydown starts hold, keyup jumps)
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space") {
     e.preventDefault();
-    if (!verseOverlay.classList.contains("hidden")) return;
-    startGameAndFlap();
+    beginHold();
+  }
+});
+window.addEventListener("keyup", (e) => {
+  if (e.code === "Space") {
+    e.preventDefault();
+    endHoldAndJump();
   }
 });
 
@@ -549,6 +547,79 @@ function roundRectFill(x, y, w, h, r, fillStyle) {
   ctx.arcTo(x, y, x + w, y, rr);
   ctx.closePath();
   ctx.fill();
+}
+
+// Upgraded powerup drawings (no image files required)
+function drawPowerup(u) {
+  if (u.taken) return;
+
+  const isBread = u.type === "bread";
+  const isMilk = u.type === "milk";
+
+  ctx.save();
+
+  // soft glow halo
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.arc(u.x, u.y, u.r + 14, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.07)";
+  ctx.fill();
+
+  // base chip
+  ctx.beginPath();
+  ctx.arc(u.x, u.y, u.r + 2, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.fill();
+
+  // inner disc
+  ctx.beginPath();
+  ctx.arc(u.x, u.y, u.r, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.16)";
+  ctx.fill();
+
+  if (isBread) {
+    // loaf silhouette
+    ctx.globalAlpha = 0.92;
+    roundRectFill(u.x - 11, u.y - 7, 22, 14, 9, "rgba(255,255,255,0.90)");
+
+    // loaf top bump / highlight
+    ctx.globalAlpha = 0.55;
+    roundRectFill(u.x - 10, u.y - 10, 20, 8, 8, "rgba(255,255,255,0.70)");
+
+    // little bread cuts
+    ctx.globalAlpha = 0.25;
+    roundRectFill(u.x - 6, u.y - 3, 3, 6, 999, "rgba(0,0,0,0.45)");
+    roundRectFill(u.x - 1, u.y - 3, 3, 6, 999, "rgba(0,0,0,0.45)");
+    roundRectFill(u.x + 4, u.y - 3, 3, 6, 999, "rgba(0,0,0,0.45)");
+  }
+
+  if (isMilk) {
+    // jug body
+    ctx.globalAlpha = 0.92;
+    roundRectFill(u.x - 8, u.y - 9, 16, 18, 5, "rgba(255,255,255,0.92)");
+
+    // cap
+    ctx.globalAlpha = 0.70;
+    roundRectFill(u.x - 5, u.y - 12, 10, 5, 3, "rgba(255,255,255,0.78)");
+
+    // label band
+    ctx.globalAlpha = 0.22;
+    roundRectFill(u.x - 6, u.y - 1, 12, 5, 3, "rgba(0,0,0,0.55)");
+
+    // shine strip
+    ctx.globalAlpha = 0.28;
+    roundRectFill(u.x - 6.5, u.y - 7, 3, 12, 999, "rgba(255,255,255,0.90)");
+
+    // subtle ring hint
+    ctx.globalAlpha = 0.30;
+    ctx.beginPath();
+    ctx.arc(u.x, u.y, u.r + 5, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,255,255,0.45)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  ctx.restore();
 }
 
 // Earned day/night: toggle every 40 points, smooth transition
@@ -610,7 +681,7 @@ function draw() {
 
   drawBackground(w, h);
 
-  // tubes (no visible outlines)
+  // tubes (no visible outlines) — reverted from clouds
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
@@ -618,27 +689,13 @@ function draw() {
     roundRectFill(p.x, gapBot, p.w, h - gapBot, 12, "rgba(0,0,0,0.72)");
   }
 
-  // powerups (BIG emoji)
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = `900 ${S.itemFontPx}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
-  for (const it of S.items) {
-    if (!it.alive) continue;
-    // subtle glow so they pop
-    ctx.globalAlpha = 0.18;
-    ctx.beginPath();
-    ctx.arc(it.x, it.y, it.r + 16, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255,255,255,0.35)";
-    ctx.fill();
-    ctx.globalAlpha = 1;
-
-    ctx.fillStyle = "rgba(255,255,255,0.95)";
-    ctx.fillText(it.type === "bread" ? "🍞" : "🥛", it.x, it.y);
-  }
+  // powerups
+  for (const u of S.powerups) drawPowerup(u);
 
   // player glow
-  const glow = 16 + 30 * Math.min(S.light, 1.0);
-  const alpha = 0.20 + 0.55 * Math.min(S.light, 1.0);
+  const lightForGlow = clamp(S.light, 0, 1.2);
+  const glow = 16 + 30 * lightForGlow;
+  const alpha = 0.20 + 0.55 * clamp(lightForGlow, 0, 1);
 
   ctx.beginPath();
   ctx.arc(S.x, S.y, glow, 0, Math.PI * 2);
@@ -654,9 +711,6 @@ function draw() {
   // HUD (logo-safe)
   const hudTopY = 86;
 
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-
   ctx.font = "700 16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
   ctx.fillStyle = "rgba(255,255,255,0.88)";
   ctx.fillText(`Score: ${S.score}`, 14, hudTopY);
@@ -665,35 +719,29 @@ function draw() {
   ctx.fillStyle = "rgba(255,255,255,0.62)";
   ctx.fillText(`Best: ${S.best}`, 14, hudTopY + 18);
 
-  // light bar (shows overcharge!)
+  // light bar (supports overcharge)
   const bx = 14, by = hudTopY + 30, bw = 160, bh = 10;
-  const lightPct = clamp(S.light / S.lightMaxOver, 0, 1);
-
   roundRectFill(bx, by, bw, bh, 999, "rgba(255,255,255,0.12)");
-  roundRectFill(
-    bx,
-    by,
-    bw * lightPct,
-    bh,
-    999,
-    `rgba(255,255,255,${0.22 + 0.65 * Math.min(S.light, 1.0)})`
-  );
+
+  const baseFill = clamp(S.light, 0, 1);
+  roundRectFill(bx, by, bw * baseFill, bh, 999, `rgba(255,255,255,${0.22 + 0.65 * baseFill})`);
+
+  // overcharge (1.0 -> 1.5)
+  if (S.light > 1.0001) {
+    const extra = clamp(S.light - 1, 0, 0.5) / 0.5; // 0..1
+    ctx.globalAlpha = 0.55;
+    roundRectFill(bx + bw * 1.0, by, bw * 0.22 * extra, bh, 999, "rgba(255,255,255,0.85)");
+    ctx.globalAlpha = 1;
+  }
 
   // Light label UNDER the bar
   ctx.fillStyle = "rgba(255,255,255,0.62)";
   ctx.fillText("Light", bx, by + bh + 16);
 
-  // Powerup note under Light label
-  if (S.hudNoteT > 0 && S.hudNote) {
-    ctx.font = "700 12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillStyle = "rgba(255,255,255,0.80)";
-    ctx.fillText(S.hudNote, bx, by + bh + 34);
-  }
-
-  // BIG tap to start (lowered slightly)
+  // BIG tap to start (center-left)
   if (!S.started && verseOverlay.classList.contains("hidden")) {
     const tx = Math.round(w * 0.22);
-    const ty = Math.round(h * 0.60) + 22; // ~half inch-ish lower
+    const ty = Math.round(h * 0.60);
 
     ctx.textAlign = "left";
     ctx.font = "900 44px system-ui, -apple-system, Segoe UI, Roboto, Arial";
@@ -709,7 +757,7 @@ function draw() {
     ctx.textAlign = "left";
     ctx.font = "700 13px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     ctx.fillStyle = "rgba(255,255,255,0.74)";
-    ctx.fillText(S.msg, 14, by + bh + 62);
+    ctx.fillText(S.msg, 14, by + bh + 46);
   }
 }
 
@@ -740,28 +788,34 @@ let last = performance.now();
 function update(dt) {
   const h = window.innerHeight;
 
-  // speed plateau (no endless ramp)
-  const target = Math.min(S.baseScroll + S.score * S.scrollPerScore, S.maxScroll);
-  S.scroll = target * (0.82 + 0.18 * Math.min(S.light, 1.0));
+  // plateau speed instead of endless ramp
+  const targetScroll = Math.min(S.maxScroll, S.baseScroll + S.score * S.scrollRampPerScore);
+
+  // keep light affects speed vibe, but subtle
+  const lightSpeedFactor = 0.90 + 0.10 * clamp(S.light, 0, 1);
+  S.scroll = targetScroll * lightSpeedFactor;
 
   updateDayNight();
 
   for (const p of S.pipes) p.x -= S.scroll * dt;
-  for (const it of S.items) it.x -= S.scroll * dt;
-
   S.pipes = S.pipes.filter(p => p.x + p.w > -140);
-  S.items = S.items.filter(it => it.x > -200 && it.alive);
-
   ensurePipesAhead();
 
-  S.vy += S.gravity * dt;
+  for (const u of S.powerups) u.x -= S.scroll * dt;
+  S.powerups = S.powerups.filter(u => u.x + 60 > -140);
+
+  // post-jump gravity grace
+  const nowMs = performance.now();
+  const gScale = nowMs < S.postJumpUntilMs ? S.postJumpGravityScale : 1.0;
+
+  S.vy += S.gravity * gScale * dt;
   S.vy = clamp(S.vy, -1200, S.maxFall);
   S.y += S.vy * dt;
 
   if (S.y < S.r) { S.y = S.r; S.vy *= -0.25; hit(); }
   if (S.y > h - S.r) { S.y = h - S.r; hit(); }
 
-  // collisions: tubes + scoring
+  // collisions (no “soft clouds” now — tubes are strict like before)
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
@@ -777,15 +831,27 @@ function update(dt) {
     }
   }
 
-  // collisions: items
-  for (const it of S.items) {
-    if (!it.alive) continue;
-    if (circleCircleCollide(S.x, S.y, S.r, it.x, it.y, it.r)) {
-      collectItem(it);
+  // powerup collection
+  for (const u of S.powerups) {
+    if (u.taken) continue;
+    const dx = S.x - u.x;
+    const dy = S.y - u.y;
+    const rr = (S.r + u.r);
+    if (dx * dx + dy * dy <= rr * rr) {
+      u.taken = true;
+      sfxPowerup();
+
+      if (u.type === "bread") {
+        S.light = clamp(S.light + 0.35, 0, S.lightMaxOver);
+      } else {
+        // milk: 150% light
+        S.light = clamp(Math.max(S.light, 1.0) + 0.75, 0, S.lightMaxOver);
+        S.overchargeUntilMs = performance.now() + 2500;
+      }
     }
   }
 
-  // regen + overcharge drain rules
+  // regen (allows overcharge, then decays back to 1)
   const t = performance.now() / 1000;
   const calm = Math.abs(S.vy) < 260;
   const coasting = (t - S.lastFlapT) >= S.regenCoastGateSec;
@@ -793,19 +859,16 @@ function update(dt) {
   let regen = S.regenBasePerSec;
   if (calm && coasting) regen += S.regenCalmBonusPerSec;
 
-  // Only regen up to 100% naturally
-  if (S.light <= S.lightMaxNormal) {
-    S.light = clamp(S.light + regen * dt, 0, S.lightMaxNormal);
-  } else {
-    // If overcharged, drain back down toward 100% (grace period feel)
-    S.light = clamp(S.light - S.overDrainPerSec * dt, S.lightMaxNormal, S.lightMaxOver);
+  S.light = clamp(S.light + regen * dt, 0, S.lightMaxOver);
+
+  // Overcharge decay
+  if (S.light > 1.0001) {
+    const decay = (performance.now() < S.overchargeUntilMs) ? 0.06 : 0.22; // per sec
+    S.light = Math.max(1.0, S.light - decay * dt);
   }
 
   if (S.msgT > 0) S.msgT -= dt;
   if (S.msgT <= 0 && S.running) S.msg = "";
-
-  if (S.hudNoteT > 0) S.hudNoteT -= dt;
-  if (S.hudNoteT <= 0) S.hudNote = "";
 
   if (S.light <= 0.0001) endRun();
 }
