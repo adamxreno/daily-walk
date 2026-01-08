@@ -7,7 +7,7 @@
 // 3. Powerups: 🍞🥛 emojis (larger r=18, bold 38px font), collect msgs "Bread 🍞 Light Restored" / "Milk 🥛 Light Overfilled" under Light bar (msgT=2.0s)
 // 4. Time: Pacific (America/Los_Angeles) via Intl.DateTimeFormat instead of UTC
 // 5. End-screen: fixed off-center/zoom with overlay env() padding + viewport maximum-scale=1.0 user-scalable=no
-// NO OTHER CHANGES
+// FIX: Removed artificial DPR cap (now uses full devicePixelRatio) → fixes massive zoom-in on high-DPI devices (iPhone 15 Pro Max, modern laptops)
 
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
@@ -259,9 +259,9 @@ function sfxPowerup() {
   playTone({ type:"sine", freq: 1200, dur: 0.03, gain: 0.04, release: 0.02 });
 }
 
-// ---------- Canvas sizing ----------
+// ---------- Canvas sizing (FIXED: full devicePixelRatio, no artificial cap) ----------
 function resizeCanvas() {
-  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.floor(window.innerWidth * dpr);
   canvas.height = Math.floor(window.innerHeight * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -383,20 +383,19 @@ function smoothGapY(targetGapY) {
 }
 
 function maybeSpawnPowerup(pipe) {
-  // powerups spawn in slightly dangerous positions near gap edges
   const chance = 0.22;
   if (Math.random() > chance) return;
 
-  const edgeOffset = 26; // adjusted for larger r=18
-  const side = Math.random() < 0.5 ? -1 : 1; // top-edge or bottom-edge
+  const edgeOffset = 26;
+  const side = Math.random() < 0.5 ? -1 : 1;
   const y = pipe.gapY + side * (pipe.gapH / 2 - edgeOffset);
 
-  const type = Math.random() < 0.72 ? "bread" : "milk"; // milk rarer
+  const type = Math.random() < 0.72 ? "bread" : "milk";
   S.powerups.push({
     id: S.powerupId++,
     x: pipe.x + pipe.w * 0.5,
     y,
-    r: 18, // larger for easy visibility
+    r: 18,
     type,
     taken: false,
   });
@@ -467,13 +466,11 @@ function doJump(strengthScale = 1) {
   const strength = (0.88 + 0.28 * clamp(S.light, 0, 1)) * strengthScale;
   S.vy = S.thrust * strength;
 
-  // Post-jump gravity grace window
   S.postJumpUntilMs = performance.now() + S.postJumpGraceMs;
 
   sfxFlap();
 }
 
-// Tap-to-start should start instantly, then your first jump happens immediately.
 function startGameAndInitialJump() {
   if (!S.started) {
     S.started = true;
@@ -510,14 +507,13 @@ function endHoldAndJump() {
   const clamped = clamp(held, 0, S.maxHoldMs);
   const t = clamped / S.maxHoldMs;
 
-  // smoothstep easing
   const eased = t * t * (3 - 2 * t);
   const scale = S.minJumpScale + (S.maxJumpScale - S.minJumpScale) * eased;
 
   doJump(scale);
 }
 
-// Pointer controls (hold duration affects jump)
+// Pointer controls
 window.addEventListener("pointerdown", (e) => {
   e.preventDefault();
   beginHold();
@@ -528,7 +524,7 @@ window.addEventListener("pointerup", (e) => {
   endHoldAndJump();
 }, { passive: false });
 
-// Spacebar controls (keydown starts hold, keyup jumps)
+// Spacebar controls
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space") {
     e.preventDefault();
@@ -563,14 +559,14 @@ function drawPowerup(u) {
 
   ctx.save();
 
-  // soft glow halo (brighter for emoji pop)
+  // soft glow halo
   ctx.globalAlpha = 1;
   ctx.beginPath();
   ctx.arc(u.x, u.y, u.r + 18, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(255,255,255,0.15)";
   ctx.fill();
 
-  // emoji (large, bold, centered)
+  // emoji
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.font = "bold 38px system-ui, -apple-system, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji";
@@ -581,9 +577,9 @@ function drawPowerup(u) {
   ctx.restore();
 }
 
-// Earned day/night: toggle every 40 points, smooth transition
+// Earned day/night
 function updateDayNight() {
-  const phase = Math.floor(S.score / S.dayEvery) % 2; // 0=night, 1=day
+  const phase = Math.floor(S.score / S.dayEvery) % 2;
   S.dayTarget = phase === 1 ? 1 : 0;
   S.dayAmount = lerp(S.dayAmount, S.dayTarget, 0.02);
 }
@@ -640,7 +636,7 @@ function draw() {
 
   drawBackground(w, h);
 
-  // tubes (no visible outlines) — reverted from clouds
+  // tubes
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
@@ -667,8 +663,8 @@ function draw() {
   ctx.fillStyle = "rgba(255,255,255,0.88)";
   ctx.fill();
 
-  // HUD (logo-safe, nudged down slightly for safe-area compatibility)
-  const hudTopY = 100; // was 86, safer below dynamic island
+  // HUD
+  const hudTopY = 100;
 
   ctx.font = "700 16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
   ctx.fillStyle = "rgba(255,255,255,0.88)";
@@ -678,29 +674,27 @@ function draw() {
   ctx.fillStyle = "rgba(255,255,255,0.62)";
   ctx.fillText(`Best: ${S.best}`, 14, hudTopY + 18);
 
-  // light bar (supports overcharge)
+  // light bar
   const bx = 14, by = hudTopY + 30, bw = 160, bh = 10;
   roundRectFill(bx, by, bw, bh, 999, "rgba(255,255,255,0.12)");
 
   const baseFill = clamp(S.light, 0, 1);
   roundRectFill(bx, by, bw * baseFill, bh, 999, `rgba(255,255,255,${0.22 + 0.65 * baseFill})`);
 
-  // overcharge (1.0 -> 1.5)
   if (S.light > 1.0001) {
-    const extra = clamp(S.light - 1, 0, 0.5) / 0.5; // 0..1
+    const extra = clamp(S.light - 1, 0, 0.5) / 0.5;
     ctx.globalAlpha = 0.55;
     roundRectFill(bx + bw * 1.0, by, bw * 0.22 * extra, bh, 999, "rgba(255,255,255,0.85)");
     ctx.globalAlpha = 1;
   }
 
-  // Light label UNDER the bar
   ctx.fillStyle = "rgba(255,255,255,0.62)";
   ctx.fillText("Light", bx, by + bh + 16);
 
-  // BIG tap to start (center-left, lowered ~half inch)
+  // BIG tap to start (lowered)
   if (!S.started && verseOverlay.classList.contains("hidden")) {
     const tx = Math.round(w * 0.22);
-    const ty = Math.round(h * 0.66); // was 0.60, now lower
+    const ty = Math.round(h * 0.66);
 
     ctx.textAlign = "left";
     ctx.font = "900 44px system-ui, -apple-system, Segoe UI, Roboto, Arial";
@@ -747,10 +741,7 @@ let last = performance.now();
 function update(dt) {
   const h = window.innerHeight;
 
-  // plateau speed instead of endless ramp
   const targetScroll = Math.min(S.maxScroll, S.baseScroll + S.score * S.scrollRampPerScore);
-
-  // keep light affects speed vibe, but subtle
   const lightSpeedFactor = 0.90 + 0.10 * clamp(S.light, 0, 1);
   S.scroll = targetScroll * lightSpeedFactor;
 
@@ -763,7 +754,6 @@ function update(dt) {
   for (const u of S.powerups) u.x -= S.scroll * dt;
   S.powerups = S.powerups.filter(u => u.x + 60 > -140);
 
-  // post-jump gravity grace
   const nowMs = performance.now();
   const gScale = nowMs < S.postJumpUntilMs ? S.postJumpGravityScale : 1.0;
 
@@ -774,7 +764,6 @@ function update(dt) {
   if (S.y < S.r) { S.y = S.r; S.vy *= -0.25; hit(); }
   if (S.y > h - S.r) { S.y = h - S.r; hit(); }
 
-  // collisions (no “soft clouds” now — tubes are strict like before)
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
@@ -790,7 +779,6 @@ function update(dt) {
     }
   }
 
-  // powerup collection
   for (const u of S.powerups) {
     if (u.taken) continue;
     const dx = S.x - u.x;
@@ -804,16 +792,14 @@ function update(dt) {
         S.light = clamp(S.light + 0.35, 0, S.lightMaxOver);
         S.msg = "Bread 🍞 Light Restored";
       } else {
-        // milk: 150% light
         S.light = clamp(Math.max(S.light, 1.0) + 0.75, 0, S.lightMaxOver);
         S.overchargeUntilMs = performance.now() + 2500;
         S.msg = "Milk 🥛 Light Overfilled";
       }
-      S.msgT = 2.0; // longer display
+      S.msgT = 2.0;
     }
   }
 
-  // regen (allows overcharge, then decays back to 1)
   const t = performance.now() / 1000;
   const calm = Math.abs(S.vy) < 260;
   const coasting = (t - S.lastFlapT) >= S.regenCoastGateSec;
@@ -823,9 +809,8 @@ function update(dt) {
 
   S.light = clamp(S.light + regen * dt, 0, S.lightMaxOver);
 
-  // Overcharge decay
   if (S.light > 1.0001) {
-    const decay = (performance.now() < S.overchargeUntilMs) ? 0.06 : 0.22; // per sec
+    const decay = (performance.now() < S.overchargeUntilMs) ? 0.06 : 0.22;
     S.light = Math.max(1.0, S.light - decay * dt);
   }
 
@@ -847,15 +832,15 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-// boot
+// boot (FIXED: full devicePixelRatio here too)
 (function init() {
-  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.floor(window.innerWidth * dpr);
   canvas.height = Math.floor(window.innerHeight * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 })();
 window.addEventListener("resize", () => {
-  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.floor(window.innerWidth * dpr);
   canvas.height = Math.floor(window.innerHeight * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -863,7 +848,6 @@ window.addEventListener("resize", () => {
 
 loadBest();
 
-// Tap-to-start state: set a stable starting position (no falling)
 S.x = Math.round(window.innerWidth * 0.28);
 S.y = Math.round(window.innerHeight * 0.45);
 S.vy = 0;
