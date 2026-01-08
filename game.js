@@ -563,12 +563,6 @@ function drawPowerup(u) {
 
   ctx.save();
 
-  // soft glow halo (brighter for emoji pop)
-  ctx.globalAlpha = 1;
-  ctx.beginPath();
-  ctx.arc(u.x, u.y, u.r + 18, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(255,255,255,0.15)";
-  ctx.fill();
 
   // emoji (large, bold, centered)
   ctx.textAlign = "center";
