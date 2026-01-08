@@ -702,13 +702,11 @@ function draw() {
     const tx = Math.round(w * 0.22);
     const ty = Math.round(h * 0.72); // was 0.60, now lower
 
-    ctx.textAlign = "left";
-    ctx.font = "900 44px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillStyle = "rgba(255,255,255,0.92)";
-    ctx.fillText("Tap to start", tx, ty);
+  ctx.textAlign = "left";
+  ctx.font = "900 44px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.fillText("Tap to start", tx, ty);
 
-  // Smaller hint — perfectly centered on screen
-  ctx.textAlign = "center";
   ctx.font = "800 16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
   ctx.fillStyle = "rgba(255,255,255,0.62)";
   ctx.fillText("Spacebar works too 🫣", tx, ty + 28);
