@@ -1,176 +1,175 @@
-/* style.css */
-
-/* Safe-area variables for iPhone notch/home indicator */
 :root{
-  --sat: env(safe-area-inset-top);
-  --sab: env(safe-area-inset-bottom);
-  --sal: env(safe-area-inset-left);
-  --sar: env(safe-area-inset-right);
+  --bg:#0b0f14;
+  --card:#151a21;
+  --card2:#0f141b;
+  --text:#ffffff;
+  --muted:rgba(255,255,255,.7);
+  --muted2:rgba(255,255,255,.55);
+  --shadow: rgba(0,0,0,.55);
+  --radius: 18px;
 }
 
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  background: #0f131a;
-  overflow: hidden;          /* game canvas = no page scroll */
+*{ box-sizing:border-box; }
+
+html,body{
+  margin:0;
+  padding:0;
+  height:100%;
+  background:var(--bg);
+  overflow:hidden;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color:var(--text);
+}
+
+canvas{
+  display:block;
+  width:100vw;
+  height:100vh;
   touch-action: manipulation;
-  -webkit-user-select: none;
-  user-select: none;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
 }
 
-/* Fullscreen canvas behind the notch */
-#c{
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  /* iOS dynamic viewport */
-  height: 100dvh;
-  display: block;
-}
-
-/* Logo header: safe area aware */
-#hudTop{
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  padding-top: calc(var(--sat) + 10px);
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-  z-index: 10;
-}
-
+/* logo always visible, screenshot friendly */
 #logo{
-  height: 26px;
-  width: auto;
-  opacity: 0.92;
-  filter: drop-shadow(0 6px 18px rgba(0,0,0,0.35));
+  position:fixed;
+  top:14px;
+  left:50%;
+  transform:translateX(-50%);
+  height:32px;
+  z-index:10;
+  pointer-events:none;
+  opacity:.95;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,.35));
 }
 
-/* End screen overlay: true centered + safe areas + no cut-off */
-.overlay{
-  position: fixed;
-  inset: 0;
-  height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding:
-    calc(var(--sat) + 14px)
-    calc(var(--sar) + 14px)
-    calc(var(--sab) + 14px)
-    calc(var(--sal) + 14px);
-  z-index: 20;
-  background: rgba(0,0,0,0.30);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+/* overlay modal */
+#overlay{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background: rgba(0,0,0,.62);
+  z-index:20;
+  padding: 16px;
 }
 
-.hidden{
-  display: none !important;
+#card{
+  width: min(92vw, 440px);
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 70px var(--shadow);
+  border: 1px solid rgba(255,255,255,.08);
+  overflow:hidden;
 }
 
-.card{
-  width: min(92vw, 720px);
-  max-height: calc(100dvh - var(--sat) - var(--sab) - 28px);
-  overflow: hidden;
-  border-radius: 18px;
-  background: rgba(20, 26, 35, 0.72);
-  border: 1px solid rgba(255,255,255,0.10);
-  box-shadow: 0 22px 60px rgba(0,0,0,0.45);
-  padding: 16px 16px 14px 16px;
+.cardTop{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  padding:16px 16px 8px;
 }
 
-.cardTitle{
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: rgba(255,255,255,0.92);
-  margin-bottom: 6px;
+.titleWrap{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
 }
 
-.cardSub{
-  font-size: 15px;
-  font-weight: 650;
-  color: rgba(255,255,255,0.66);
-  margin-bottom: 12px;
+#cardTitle{
+  font-size:22px;
+  font-weight:800;
+  letter-spacing:-.02em;
 }
 
-.resultRow{
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
+#cardMeta{
+  font-size:14px;
+  color: var(--muted);
 }
 
-.resultText{
-  color: rgba(255,255,255,0.70);
-  font-weight: 700;
+.subline{
+  padding: 0 16px 10px;
+  font-size: 14px;
+  color: var(--muted2);
 }
 
-.btnSecondary, .btn{
-  border: 1px solid rgba(255,255,255,0.16);
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.92);
-  font-weight: 800;
-  padding: 10px 14px;
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.btn:disabled{
-  opacity: 0.55;
-  cursor: default;
-}
-
-.scrollBox{
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(0,0,0,0.18);
+#verseBox{
+  margin: 0 16px 14px;
+  background: var(--card2);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px;
   padding: 14px;
-  max-height: 42vh;
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
-.verseText{
-  white-space: pre-wrap;
-  line-height: 1.45;
-  font-size: 18px;
-  color: rgba(255,255,255,0.90);
+#verseText{
+  font-size:16px;
+  line-height:1.45;
+  color: rgba(255,255,255,.92);
+  white-space:pre-wrap;
 }
 
-.unlockRow{
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 12px;
+#verseRef{
+  margin-top:10px;
+  font-size:15px;
+  font-weight:800;
+  color: rgba(255,255,255,.88);
 }
 
-.spacer{ flex: 1; }
-
-.hint{
-  color: rgba(255,255,255,0.58);
-  font-weight: 750;
+.cardBottom{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding: 0 16px 16px;
+  gap: 10px;
 }
 
-.right{ margin-left: auto; }
-
-.rightBtn{
-  margin-left: auto;
+.rightSlot{
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  min-width: 160px;
 }
 
-.hiddenBtn{
-  display: none !important;
+.pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.10);
+  color: rgba(255,255,255,.85);
+  font-weight:700;
+  font-size:14px;
+  min-width: 140px;
+  text-align:center;
 }
 
-.shareStatus{
-  margin-top: 10px;
-  color: rgba(255,255,255,0.62);
-  font-weight: 650;
+.primaryBtn{
+  background:#fff;
+  color:#000;
+  border:none;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-weight:800;
+  font-size:14px;
+  cursor:pointer;
+  min-width: 140px;
+}
+
+.ghostBtn{
+  background: rgba(255,255,255,.10);
+  color: rgba(255,255,255,.92);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 999px;
+  padding: 9px 12px;
+  font-weight:800;
+  font-size:13px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+
+/* Make the share button feel tappable on mobile */
+button:active{
+  transform: translateY(1px);
 }
