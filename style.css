@@ -1,4 +1,10 @@
 /* style.css */
+/* CHANGES:
+   - Canvas: position:fixed inset:0 for edge-to-edge under notch/dynamic island (with viewport-fit=cover)
+   - #hudTop: top calc(20px + env(safe-area-inset-top)) to position logo safely below notch
+   - .overlay: padding with env(safe-area-*) to center card in safe area (fixes iPhone off-center + zoom issues with meta viewport)
+*/
+
 html, body {
   margin: 0;
   padding: 0;
@@ -7,16 +13,15 @@ html, body {
 }
 
 canvas {
-  display: block;
-  width: 100vw;
-  height: 100vh;
+  position: fixed;
+  inset: 0;
   touch-action: manipulation;
 }
 
 /* Top HUD: logo only */
 #hudTop{
   position: fixed;
-  top: 10px;
+  top: calc(20px + env(safe-area-inset-top));
   left: 0;
   right: 0;
   z-index: 20;
@@ -41,6 +46,9 @@ canvas {
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   z-index: 10;
+  /* Safe area padding for centering card below notch/home indicator */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  box-sizing: border-box;
 }
 
 .hidden { display: none; }
