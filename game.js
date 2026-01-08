@@ -711,7 +711,7 @@ function draw() {
   ctx.textAlign = "center";
   ctx.font = "800 16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
   ctx.fillStyle = "rgba(255,255,255,0.62)";
-  ctx.fillText("Spacebar works too 🫣", w / 2, ty + 28);
+  ctx.fillText("Spacebar works too 🫣", tx, ty + 28);
   }
 
   if (S.msg && S.msgT > 0 && S.started && verseOverlay.classList.contains("hidden")) {
