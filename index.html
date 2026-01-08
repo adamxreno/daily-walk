@@ -3,11 +3,12 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- IMPORTANT: viewport-fit=cover enables true fullscreen behind iPhone notch -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
   <title>Liiiiiiight</title>
   <link rel="stylesheet" href="style.css" />
-  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="favicon.png" />
 </head>
 <body>
   <!-- Always-visible header (logo only) -->
@@ -36,8 +37,6 @@
 
       <div class="unlockRow">
         <div class="spacer"></div>
-
-        <!-- Countdown appears here, then Continue replaces it in the exact same spot -->
         <div id="unlockHint" class="hint right">Please wait 5s…</div>
         <button id="continueBtn" class="btn rightBtn hiddenBtn" disabled>Continue</button>
       </div>
