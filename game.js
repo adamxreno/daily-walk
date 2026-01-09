@@ -634,20 +634,13 @@ function draw() {
 
   drawBackground(w, h);
 
-// tubes — sharp outer edges, rounded inner edges
-for (const p of S.pipes) {
-  const gapTop = p.gapY - p.gapH / 2;
-  const gapBot = p.gapY + p.gapH / 2;
-  const color = "rgba(0,0,0,0.72)";
-
-  // Top tube: sharp long body + rounded cap at bottom (inner)
-  roundRectFill(p.x, -1000, p.w, gapTop + 1000, 0, color); // sharp, extends off top
-  roundRectFill(p.x, gapTop - 40, p.w, 80, 12, color);     // rounded cap at gap
-
-  // Bottom tube: sharp long body + rounded cap at top (inner)
-  roundRectFill(p.x, gapBot - 1000, p.w, h + 1000, 0, color); // sharp, extends off bottom
-  roundRectFill(p.x, gapBot - 40, p.w, 80, 12, color);        // rounded cap at gap
-}
+  // tubes (no visible outlines) — reverted from clouds
+  for (const p of S.pipes) {
+    const gapTop = p.gapY - p.gapH / 2;
+    const gapBot = p.gapY + p.gapH / 2;
+    roundRectFill(p.x, 0, p.w, gapTop, 12, "rgba(0,0,0,0.72)");
+    roundRectFill(p.x, gapBot, p.w, h - gapBot, 12, "rgba(0,0,0,0.72)");
+  }
 
   // powerups
   for (const u of S.powerups) drawPowerup(u);
