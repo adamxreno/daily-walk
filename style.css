@@ -16,7 +16,7 @@ canvas {
 /* Top HUD: logo only */
 #hudTop{
   position: fixed;
-  top: 20px;
+  top: 10px;
   left: 0;
   right: 0;
   z-index: 20;
