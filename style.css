@@ -33,10 +33,6 @@ canvas {
 
 /* Verse overlay UI */
 .overlay {
-  /* ... existing styles ... */
-  padding: env(safe-area-inset-top) 30px env(safe-area-inset-bottom) 30px;
-  box-sizing: border-box;
-}
   position: fixed;
   inset: 0;
   display: grid;
