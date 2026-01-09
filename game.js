@@ -276,8 +276,8 @@ const S = {
 
   x: 0, y: 0, vy: 0, r: 12,
 
-  gravity: 1000,
-  thrust: -420,
+  gravity: 1100,
+  thrust: -400,
   maxFall: 900,
 
   // post-jump “float forgiveness”
