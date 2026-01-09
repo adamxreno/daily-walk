@@ -634,16 +634,16 @@ function draw() {
 
   drawBackground(w, h);
 
-// tubes — extend off-screen for infinite feel (no gap overlap)
+// tubes — truly infinite, extend off both top and bottom
 for (const p of S.pipes) {
   const gapTop = p.gapY - p.gapH / 2;
   const gapBot = p.gapY + p.gapH / 2;
 
-  // Top tube: from way above to just the gap edge
-  roundRectFill(p.x, -1000, p.w, gapTop, 12, "rgba(0,0,0,0.72)");
+  // Top tube: always from way above screen to gap bottom (covers all cases)
+  roundRectFill(p.x, -1000, p.w, gapTop + 1000, 12, "rgba(0,0,0,0.72)");
 
-  // Bottom tube: from just the gap edge to way below
-  roundRectFill(p.x, gapBot, p.w, h + 1000, 12, "rgba(0,0,0,0.72)");
+  // Bottom tube: always from gap top to way below screen
+  roundRectFill(p.x, gapBot - 1000, p.w, h + 1000, 12, "rgba(0,0,0,0.72)");
 }
   // powerups
   for (const u of S.powerups) drawPowerup(u);
