@@ -634,14 +634,18 @@ function draw() {
 
   drawBackground(w, h);
 
-  // tubes (no visible outlines) — reverted from clouds
-  for (const p of S.pipes) {
-    const gapTop = p.gapY - p.gapH / 2;
-    const gapBot = p.gapY + p.gapH / 2;
-    roundRectFill(p.x, 0, p.w, gapTop, 12, "rgba(0,0,0,0.72)");
-    roundRectFill(p.x, gapBot, p.w, h - gapBot, 12, "rgba(0,0,0,0.72)");
-  }
+// tubes — extended beyond screen edges for infinite feel
+for (const p of S.pipes) {
+  const gapTop = p.gapY - p.gapH / 2;
+  const gapBot = p.gapY + p.gapH / 2;
+  const extend = 200; // how far past edges (adjust if you want more/less)
 
+  // Top tube: from way above screen to gap
+  roundRectFill(p.x, -extend, p.w, gapTop + extend, 12, "rgba(0,0,0,0.72)");
+  
+  // Bottom tube: from gap to way below screen
+  roundRectFill(p.x, gapBot - extend, p.w, h + extend - (gapBot - extend), 12, "rgba(0,0,0,0.72)");
+}
   // powerups
   for (const u of S.powerups) drawPowerup(u);
 
