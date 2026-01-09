@@ -41,14 +41,12 @@ canvas {
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   z-index: 10;
-  padding: 60px 30px;
-  box-sizing: border-box;
 }
 
 .hidden { display: none; }
 
 .card {
-  width: min(500px, calc(100vw - 60px));
+  width: min(520px, calc(100vw - 50px));
   border-radius: 18px;
   background: rgba(20, 24, 32, 0.92);
   border: 1px solid rgba(255,255,255,0.10);
