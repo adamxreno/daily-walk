@@ -13,9 +13,9 @@ canvas {
 }
 
 /* Top HUD: logo only */
-#hudTop{
+#hudTop {
   position: fixed;
-  top: 10px;
+  top: calc(20px + env(safe-area-inset-top)); /* safe below notch */
   left: 0;
   right: 0;
   z-index: 20;
