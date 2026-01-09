@@ -41,6 +41,8 @@ canvas {
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   z-index: 10;
+  padding: 60px 30px;
+  box-sizing: border-box;
 }
 
 .hidden { display: none; }
