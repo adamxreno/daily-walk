@@ -7,15 +7,16 @@ html, body {
 }
 
 canvas {
-  position: fixed;
-  inset: 0; /* top/right/bottom/left = 0 → true full screen */
+  display: block;
+  width: 100vw;
+  height: 100vh;
   touch-action: manipulation;
 }
 
 /* Top HUD: logo only */
-#hudTop {
+#hudTop{
   position: fixed;
-  top: calc(20px + env(safe-area-inset-top)); /* safe below notch */
+  top: 10px;
   left: 0;
   right: 0;
   z-index: 20;
