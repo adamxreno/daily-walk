@@ -276,7 +276,7 @@ const S = {
 
   x: 0, y: 0, vy: 0, r: 12,
 
-  gravity: 1350,
+  gravity: 1000,
   thrust: -420,
   maxFall: 900,
 
