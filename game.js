@@ -638,8 +638,8 @@ function draw() {
   for (const p of S.pipes) {
     const gapTop = p.gapY - p.gapH / 2;
     const gapBot = p.gapY + p.gapH / 2;
-    roundRectFill(p.x, 0, p.w, gapTop, 12, "rgba(0,0,0,0.72)");
-    roundRectFill(p.x, gapBot, p.w, h - gapBot, 12, "rgba(0,0,0,0.72)");
+    roundRectFill(p.x, 0, p.w, gapTop, 0, "rgba(0,0,0,0.72)");
+    roundRectFill(p.x, gapBot, p.w, h - gapBot, 0, "rgba(0,0,0,0.72)");
   }
 
   // powerups
