@@ -813,28 +813,28 @@ function update(dt) {
     }
   }
 
-  // powerup collection
-  for (const u of S.powerups) {
-    if (u.taken) continue;
-    const dx = S.x - u.x;
-    const dy = S.y - u.y;
-    const rr = (S.r + u.r);
-    if (dx * dx + dy * dy <= rr * rr) {
-      u.taken = true;
-      sfxPowerup();
+// powerup collection (bread capped at 1.0, milk exclusive overcharge)
+for (const u of S.powerups) {
+  if (u.taken) continue;
+  const dx = S.x - u.x;
+  const dy = S.y - u.y;
+  const rr = (S.r + u.r);
+  if (dx * dx + dy * dy <= rr * rr) {
+    u.taken = true;
+    sfxPowerup();
 
-      if (u.type === "bread") {
-        S.light = clamp(S.light + 0.35, 0, S.lightMaxOver);
-        S.msg = "Bread 🍞 Light Restored";
-      } else {
-        // milk: 150% light
-        S.light = clamp(Math.max(S.light, 1.0) + 0.75, 0, S.lightMaxOver);
-        S.overchargeUntilMs = performance.now() + 2500;
-        S.msg = "Milk 🥛 Light Overfilled";
-      }
-      S.msgT = 2.0; // longer display
+    if (u.type === "bread") {
+      // Bread: restore up to 100% max (no overcharge)
+      S.light = clamp(S.light + 0.35, 0, 1.0);
+    } else {
+      // Milk: exclusive overcharge (150% + timer)
+      S.light = clamp(Math.max(S.light, 1.0) + 0.75, 0, S.lightMaxOver);
+      S.overchargeUntilMs = performance.now() + 2500;
     }
+    S.msg = u.type === "bread" ? "Bread 🍞 Light Boost" : "Milk 🥛 Light Overfilled";
+    S.msgT = 2.0;
   }
+}
 
   // regen (allows overcharge, then decays back to 1)
   const t = performance.now() / 1000;
