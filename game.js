@@ -634,17 +634,16 @@ function draw() {
 
   drawBackground(w, h);
 
-// tubes — extended beyond screen edges for infinite feel
+// tubes — extend off-screen for infinite feel
 for (const p of S.pipes) {
   const gapTop = p.gapY - p.gapH / 2;
   const gapBot = p.gapY + p.gapH / 2;
-  const extend = 200; // how far past edges (adjust if you want more/less)
 
-  // Top tube: from way above screen to gap
-  roundRectFill(p.x, -extend, p.w, gapTop + extend, 12, "rgba(0,0,0,0.72)");
-  
+  // Top tube: from way above screen (negative y) to gap
+  roundRectFill(p.x, -1000, p.w, gapTop + 1000, 12, "rgba(0,0,0,0.72)");
+
   // Bottom tube: from gap to way below screen
-  roundRectFill(p.x, gapBot - extend, p.w, h + extend - (gapBot - extend), 12, "rgba(0,0,0,0.72)");
+  roundRectFill(p.x, gapBot - 1000, p.w, h + 2000, 12, "rgba(0,0,0,0.72)");
 }
   // powerups
   for (const u of S.powerups) drawPowerup(u);
