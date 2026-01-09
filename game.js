@@ -640,6 +640,14 @@ function draw() {
     const gapBot = p.gapY + p.gapH / 2;
     roundRectFill(p.x, 0, p.w, gapTop, 12, "rgba(0,0,0,0.72)");
     roundRectFill(p.x, gapBot, p.w, h - gapBot, 12, "rgba(0,0,0,0.72)");
+
+  // Tiny black sharp rectangles to "cut off" outer rounding
+  // Top cover: covers the rounded top of the top tube
+  ctx.fillStyle = "rgba(0,0,0,0.72)";
+  ctx.fillRect(p.x, 0, p.w, 20);  // 20px tall cover at very top
+
+  // Bottom cover: covers the rounded bottom of the bottom tube
+  ctx.fillRect(p.x, h - 20, p.w, 20);  // 20px tall cover at very bottom
   }
 
   // powerups
