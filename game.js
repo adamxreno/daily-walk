@@ -653,28 +653,30 @@ function draw() {
   // powerups
   for (const u of S.powerups) drawPowerup(u);
 
-  // player glow — normal = soft white, overcharge (milk) = golden divine
-  const baseLight = clamp(S.light, 0, 1);
-  const overLight = clamp(S.light - 1, 0, 0.5); // extra from milk
+  // player glow — normal = soft white, golden divine ONLY from milk overcharge
+  const now = performance.now();
+  const isMilkOvercharge = (now < S.overchargeUntilMs) && S.light > 1.0;
 
-  // Base glow (always white)
+  // Base white glow (always)
+  const baseLight = clamp(S.light, 0, 1);
   const baseGlow = 16 + 30 * baseLight;
   const baseAlpha = 0.20 + 0.55 * baseLight;
+
   ctx.beginPath();
   ctx.arc(S.x, S.y, baseGlow, 0, Math.PI * 2);
   ctx.fillStyle = `rgba(255,255,255,${baseAlpha * 0.12})`;
   ctx.fill();
 
-  // Golden overglow only when milk overcharged
-  if (overLight > 0) {
-    const goldenGlow = baseGlow + 20 * overLight * 2; // grows stronger
-    const goldenAlpha = 0.35 + 0.45 * overLight;
+  // Golden divine glow — ONLY when actively in milk overcharge period
+  if (isMilkOvercharge) {
+    const overStrength = clamp(S.light - 1, 0, 0.5);
+    const goldenGlow = baseGlow + 30 * overStrength * 2; // grows with overcharge
+    const goldenAlpha = 0.4 + 0.5 * overStrength;
 
-    // Warm golden hour colors
     const g = ctx.createRadialGradient(S.x, S.y, 0, S.x, S.y, goldenGlow);
     g.addColorStop(0, `rgba(255, 230, 140, ${goldenAlpha})`);     // bright gold center
     g.addColorStop(0.4, `rgba(255, 200, 100, ${goldenAlpha * 0.7})`);
-    g.addColorStop(1, `rgba(255, 180, 60, 0)`);                  // fades to transparent
+    g.addColorStop(1, `rgba(255, 180, 60, 0)`);                  // warm fade out
 
     ctx.beginPath();
     ctx.arc(S.x, S.y, goldenGlow, 0, Math.PI * 2);
