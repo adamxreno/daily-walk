@@ -653,9 +653,9 @@ function draw() {
   // powerups
   for (const u of S.powerups) drawPowerup(u);
 
-  // player glow — normal = soft white, golden divine ONLY from milk overcharge
+  // player glow — normal = soft white, golden divine ONLY from milk overcharge (lasts full powerup time)
   const now = performance.now();
-  const isMilkOvercharge = (now < S.overchargeUntilMs) && S.light > 1.0;
+  const isOvercharged = S.light > 1.0; // glow golden until back to 100%
 
   // Base white glow (always)
   const baseLight = clamp(S.light, 0, 1);
@@ -667,8 +667,8 @@ function draw() {
   ctx.fillStyle = `rgba(255,255,255,${baseAlpha * 0.12})`;
   ctx.fill();
 
-  // Golden divine glow — ONLY when actively in milk overcharge period
-  if (isMilkOvercharge) {
+  // Golden divine glow — whenever over 100% (full powerup duration)
+  if (isOvercharged) {
     const overStrength = clamp(S.light - 1, 0, 0.5);
     const goldenGlow = baseGlow + 30 * overStrength * 2; // grows with overcharge
     const goldenAlpha = 0.4 + 0.5 * overStrength;
